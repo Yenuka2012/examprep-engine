@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "vite",
+    "predev": "npm run generate:validator",
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run src",
