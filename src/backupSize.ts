@@ -7,6 +7,6 @@ export const MAX_BACKUP_FILE_BYTES = 64 * 1024 * 1024;
  */
 export function assertRestorableBackupSize(size:number):void {
   if(!Number.isSafeInteger(size)||size<0||size>MAX_BACKUP_FILE_BYTES){
-    throw new Error('Backup exceeds the 64 MiB export/restore limit. Preserve the original browser data; export smaller individual banks and use a device with more storage if needed.');
+    throw new Error('Backup exceeds the 64 MiB export/restore limit. Existing browser data was not changed. Export individual banks separately; oversized full-history backups require a future version.');
   }
 }
