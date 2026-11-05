@@ -19,15 +19,15 @@
 | Unreviewed deployment | Verified same-run build/audit/tests/CodeQL gates, immutable Action commit pins | Main branch protections and independent human review **must be enforced in repository settings** |
 
 ## Implemented controls
-- File upload limit 5 MiB, backup limit 20 MiB, bank question limit 10,000.
+- Question bank import limit 5 MiB, symmetric encrypted backup export/restore cap 64 MiB, bank question limit 10,000; oversized full histories still need a future chunked export format.
 - JSON Schema 1.0 validated by Ajv strict mode; rejects unknown fields and duplicate/missing references.
 - AES-256-GCM encrypted exports: 16-byte random salt, 12-byte random IV, PBKDF2-HMAC-SHA-256 with 600,000 iterations.
 - All normal bank-export UI routes now encrypted; legacy plaintext exports can only be restored after a warning.
 - Web Locks fail closed on unsupported browsers; queued exam writes recheck current ownership when executing.
 - Autosave queue serializes writes and survives failures by allowing explicit retry. Final submit waits for the exact submitted state to persist or aborts.
 - Legacy sessionStorage is cleared only after a matching IndexedDB migration commits.
-- Validated restore merges without silently overwriting conflicting bank/attempt IDs.
-- Unit tests, Chromium and desktop/mobile WebKit browser tests, CodeQL JavaScript/TypeScript and GitHub Actions analysis.
+- Validated restore merges without silently overwriting conflicting bank/attempt IDs; canonical JSON comparison avoids false conflicts caused solely by property order.
+- Unit tests, Chromium and desktop/mobile WebKit browser tests, CodeQL JavaScript/TypeScript and GitHub Actions analysis; clean-checkout dev bootstraps the generated CSP-safe validator.
 - CI deploy requires same-run verify, browser-tests, codeql-gate; Actions pinned to verified full commit SHAs.
 - CycloneDX SBOM and SHA-256 asset hash artifacts generated during verify. These are **not signed provenance**.
 - PWA caching limited to public app shell.
