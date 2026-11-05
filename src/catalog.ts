@@ -114,8 +114,9 @@ export async function publishSyllabusVersion(key:string,expectedRevision:number)
     const current=await db.syllabusVersions.get(key);
     if(!current||current.status!=='draft'||current.revision!==expectedRevision)throw new Error('Draft is missing, already published or changed; reload');
     const checked=validateSyllabus(current);
+    const now=new Date().toISOString();
     const published: SyllabusVersion={...checked,status:'published',revision:checked.revision+1,
-      updatedAt:new Date().toISOString(),publishedAt:new Date().toISOString()};
+      updatedAt:now,publishedAt:now};
     await db.syllabusVersions.put(validateSyllabus(published));
   });
 }
