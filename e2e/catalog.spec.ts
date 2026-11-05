@@ -91,3 +91,50 @@ test('M1.1 rejects stale draft revisions across two browser tabs',async({page,co
     await expect(page.getByText('Outdated change')).toHaveCount(0);
   }finally{await second.close();}
 });
+
+test('M1.1 v2 active exam and answers survive the additive IndexedDB v3 migration',async({page})=>{
+  const bank=JSON.parse(await readFile('samples/demo-bank.json','utf8'));
+  const startedAt=new Date().toISOString();
+  const currentExam={
+    id:'MIGRATION-EXAM-001',bank,questions:bank.questions.slice(0,2),
+    answers:{'DEMO-Q001':['B']},marked:['DEMO-Q002'],index:1,
+    startedAt,endsAt:Date.parse(startedAt)+1800000,durationSeconds:1800
+  };
+  await page.route('**/examprep-engine/m1-migration-seed',route=>route.fulfill({
+    status:200,contentType:'text/html',body:'<!doctype html><title>Migration seed</title>'
+  }));
+  await page.goto('/examprep-engine/m1-migration-seed');
+  await page.evaluate(async({bank,session})=>{
+    await new Promise<void>((resolve,reject)=>{
+      const request=indexedDB.open('examprep-v1',20);
+      request.onupgradeneeded=()=>{
+        const native=request.result;
+        const banks=native.createObjectStore('banks',{keyPath:'bank_id'});
+        banks.createIndex('certification','certification');banks.createIndex('title','title');
+        const attempts=native.createObjectStore('attempts',{keyPath:'id'});
+        attempts.createIndex('bankId','bankId');attempts.createIndex('completedAt','completedAt');
+        native.createObjectStore('activeSessions',{keyPath:'key'});
+      };
+      request.onerror=()=>reject(request.error);
+      request.onsuccess=()=>{
+        const native=request.result;
+        const tx=native.transaction(['banks','activeSessions'],'readwrite');
+        tx.objectStore('banks').add(bank);
+        tx.objectStore('activeSessions').add({key:'current',value:session});
+        tx.oncomplete=()=>{native.close();resolve();};
+        tx.onerror=()=>{native.close();reject(tx.error);};
+      };
+    });
+  },{bank,session:currentExam});
+  await page.goto('/examprep-engine/');
+  await expect(page.getByText('Question 2 of 2')).toBeVisible();
+  await expect(page.getByRole('button',{name:'Unflag'})).toBeVisible();
+  await expect(page.getByText('Exam progress saved locally.')).toBeVisible();
+  await expect(page.getByText(/1 answered/)).toBeVisible();
+  const version=await page.evaluate(async()=>new Promise<number>((resolve,reject)=>{
+    const request=indexedDB.open('examprep-v1');
+    request.onerror=()=>reject(request.error);
+    request.onsuccess=()=>{const native=request.result;resolve(native.version);native.close();};
+  }));
+  expect(version).toBe(30);
+});
