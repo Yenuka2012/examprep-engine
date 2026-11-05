@@ -3,6 +3,7 @@ import { BookOpen, Upload, BarChart3, ShieldCheck, Download, Trash2, ArrowLeft, 
 import { db } from './db';
 import { isCorrect, shuffle, validateBank } from './logic';
 import { encryptBackup, decryptBackup, isEncryptedBackup, type EncryptedBackup } from './crypto';
+import { validateBackupData } from './backup';
 import type { Attempt, ExamSession, QuestionBank } from './types';
 
 type Page = 'dashboard' | 'banks' | 'exam' | 'analytics';
@@ -156,17 +157,11 @@ export default function App() {
       if(!backupPassphrase)throw new Error('Enter the backup passphrase before restoring');
       const decrypted=await decryptBackup(raw as EncryptedBackup,backupPassphrase);
       if(!decrypted||typeof decrypted!=='object'||Array.isArray(decrypted)){throw new Error('Invalid decrypted backup');}
-      const data=decrypted as Record<string,unknown>;
-      if(data.backup_version!==1||!Array.isArray(data.banks)||!Array.isArray(data.attempts))throw new Error('Unsupported backup version');
-      if(data.banks.length>300||data.attempts.length>50000)throw new Error('Backup exceeds safety limits');
-      const validated=data.banks.map(validateBank);
-      if(validated.some(v=>v.errors.length))throw new Error('Backup contains invalid question banks');
-      const validAttempts=data.attempts.every(v=>v&&typeof v==='object'&&typeof v.id==='string'&&typeof v.bankId==='string'&&Array.isArray(v.questionSnapshots)&&typeof v.completedAt==='string');
-      if(!validAttempts)throw new Error('Backup contains invalid attempt records');
+      const validated=validateBackupData(decrypted);
       if(!window.confirm('Restore backup into this browser? Existing records with matching IDs will be replaced.'))return;
       await db.transaction('rw',db.banks,db.attempts,async()=>{
-        await db.banks.bulkPut(validated.map(v=>v.bank!));
-        await db.attempts.bulkPut(data.attempts as Attempt[]);
+        await db.banks.bulkPut(validated.banks);
+        await db.attempts.bulkPut(validated.attempts);
       });
       await reload();setNotice('Backup restored successfully');
     }catch(e){setError(e instanceof Error?e.message:'Restore failed');}
