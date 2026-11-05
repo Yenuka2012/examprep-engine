@@ -19,7 +19,7 @@ describe('M1.1 certification catalog validation',()=>{
     expect(validateSyllabus(syllabus())).toEqual(syllabus());
   });
   it('rejects prototype-like keys and malformed certification records',()=>{
-    expect(()=>validateCertification({...profile(),id:'__proto__'})).not.toThrow();
+    expect(()=>validateCertification({...profile(),id:'__proto__'})).toThrow(/Invalid/);
     expect(()=>validateCertification({...profile(),injected:'x'})).toThrow(/Unsupported/);
     expect(()=>validateCertification({...profile(),id:'../DEMO'})).toThrow(/Invalid/);
     expect(()=>validateCertification({...profile(),provider:'x'.repeat(101)})).toThrow(/Provider/);
