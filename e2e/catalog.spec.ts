@@ -138,3 +138,35 @@ test('M1.1 v2 active exam and answers survive the additive IndexedDB v3 migratio
   }));
   expect(version).toBe(30);
 });
+
+test('M1.1 prevents a v2 IndexedDB reader from silently downgrading an upgraded profile',async({page})=>{
+  await page.goto('/examprep-engine/');
+  await createCatalog(page);
+  const report=await page.evaluate(async()=>{
+    const failure=await new Promise<string>((resolve,reject)=>{
+      // M0.1 Dexie version 2 maps to native IndexedDB version 20.
+      // Once a profile has migrated to v3 (version 30), opening with
+      // version 20 must fail closed without overwriting any store.
+      const request=indexedDB.open('examprep-v1',20);
+      request.onsuccess=()=>{
+        request.result.close();
+        reject(new Error('Unsafe legacy database downgrade succeeded'));
+      };
+      request.onerror=()=>resolve(request.error?.name??'UnknownError');
+      request.onblocked=()=>reject(new Error('Downgrade open unexpectedly blocked'));
+    });
+    const contents=await new Promise<{version:number;count:number}>((resolve,reject)=>{
+      const request=indexedDB.open('examprep-v1');
+      request.onerror=()=>reject(request.error);
+      request.onsuccess=()=>{
+        const database=request.result;
+        const tx=database.transaction('certifications','readonly');
+        const count=tx.objectStore('certifications').count();
+        count.onsuccess=()=>{resolve({version:database.version,count:count.result});database.close();};
+        count.onerror=()=>{reject(count.error);database.close();};
+      };
+    });
+    return {failure,...contents};
+  });
+  expect(report).toEqual({failure:'VersionError',version:30,count:1});
+});
