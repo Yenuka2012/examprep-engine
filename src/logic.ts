@@ -55,9 +55,11 @@ export function validateBank(data:unknown):{bank?:QuestionBank;errors:string[]} 
   const bank=data as QuestionBank;
   const errors:string[]=[];
   const ids=new Set<string>();
+  const forbiddenIds=new Set(['constructor','prototype','__proto__','toString','valueOf','hasOwnProperty','isPrototypeOf','propertyIsEnumerable','toLocaleString']);
   for (const [i,q] of bank.questions.entries()){
     const prefix='questions['+i+']';
     if(ids.has(q.id)) errors.push(prefix+'.id duplicated');
+    if(forbiddenIds.has(q.id)) errors.push(prefix+'.id uses a reserved JavaScript object property');
     ids.add(q.id);
     const opts=new Set(q.options.map(o=>o.id));
     if(opts.size!==q.options.length)errors.push(prefix+'.options duplicate IDs');
