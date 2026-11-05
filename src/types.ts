@@ -20,3 +20,18 @@ export type ExamSession = {
   startedAt: string; endsAt: number; durationSeconds: number;
 };
 export type StoredSession = {key: 'current'; value: ExamSession};
+
+/** M1.1 catalog records live alongside, never inside, legacy exam snapshots. */
+export type CertificationProfile={
+  id:string; name:string; provider:string; createdAt:string;
+};
+export type SyllabusDomain={
+  code:string; name:string; weight:number; objectives:string[];
+};
+export type SyllabusVersion={
+  /** Stable compound key: certificationId/version */
+  id:string; certificationId:string; version:string; title:string;
+  sourceUrl?:string; reviewedAt?:string;
+  domains:SyllabusDomain[];status:'draft'|'published';revision:number;
+  createdAt:string;updatedAt:string;publishedAt?:string;
+};
