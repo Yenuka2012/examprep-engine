@@ -1,0 +1,196 @@
+import { useEffect, useMemo, useState } from 'react';
+import { BookOpen, Upload, BarChart3, ShieldCheck, Download, Trash2, ArrowLeft, CheckCircle2, Clock3, Flag, Shuffle, Play, RefreshCcw } from 'lucide-react';
+import { db } from './db';
+import { isCorrect, shuffle, validateBank } from './logic';
+import type { Attempt, Question, QuestionBank } from './types';
+
+type Page = 'dashboard' | 'banks' | 'exam' | 'analytics';
+type Session = {
+  id: string; bank: QuestionBank; questions: Question[]; answers: Record<string,string[]>;
+  marked: string[]; index: number; startedAt: string; endsAt: number; durationSeconds: number;
+};
+const SESSION_KEY = 'examprep-active-session-v1';
+const MAX_FILE_BYTES = 5 * 1024 * 1024;
+function fmtTime(seconds:number) { const s=Math.max(0,Math.floor(seconds)); return Math.floor(s/60).toString().padStart(2,'0')+':'+(s%60).toString().padStart(2,'0'); }
+function formatDate(s:string){return new Date(s).toLocaleString();}
+function pct(a:number,b:number){return b ? Math.round(a/b*100) : 0;}
+
+export default function App() {
+  const [page,setPage]=useState<Page>('dashboard');
+  const [banks,setBanks]=useState<QuestionBank[]>([]);
+  const [attempts,setAttempts]=useState<Attempt[]>([]);
+  const [session,setSession]=useState<Session|null>(()=>{
+    try { const raw=sessionStorage.getItem(SESSION_KEY); return raw?JSON.parse(raw) as Session:null; }catch {return null;}
+  });
+  const [viewResult,setViewResult]=useState<Attempt|null>(null);
+  const [selectedBank,setSelectedBank]=useState('');
+  const [examSize,setExamSize]=useState(20);
+  const [examMinutes,setExamMinutes]=useState(30);
+  const [domain,setDomain]=useState('ALL');
+  const [error,setError]=useState('');
+  const [notice,setNotice]=useState('');
+  const [busy,setBusy]=useState(false);
+  const [now,setNow]=useState(Date.now());
+
+  async function reload(){setBanks(await db.banks.toArray());setAttempts((await db.attempts.toArray()).sort((a,b)=>b.completedAt.localeCompare(a.completedAt)));}
+  useEffect(()=>{void reload();},[]);
+  useEffect(()=>{if(session)sessionStorage.setItem(SESSION_KEY,JSON.stringify(session));else sessionStorage.removeItem(SESSION_KEY);},[session]);
+  useEffect(()=>{if(!session)return;const t=window.setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(t);},[session]);
+
+  const bank=banks.find(b=>b.bank_id===selectedBank)??banks[0];
+  const domains=useMemo(()=>bank?[...new Set(bank.questions.map(q=>q.domain))].sort():[],[bank]);
+  const eligible=useMemo(()=>bank?.questions.filter(q=>domain==='ALL'||q.domain===domain)??[],[bank,domain]);
+  const timeLeft=session ? Math.max(0,Math.ceil((session.endsAt-now)/1000)) : 0;
+
+  function completeExam(active:Session){
+    const correctCount=active.questions.filter(q=>isCorrect(q,active.answers[q.id]??[])).length;
+    const record:Attempt={
+      id:active.id, bankId:active.bank.bank_id,bankTitle:active.bank.title,certification:active.bank.certification,
+      startedAt:active.startedAt,completedAt:new Date().toISOString(),durationSeconds:active.durationSeconds,
+      answers:active.answers,questionSnapshots:active.questions,correctCount,total:active.questions.length
+    };
+    setSession(null);setViewResult(record);setPage('exam');
+    void db.attempts.put(record).then(reload).catch(()=>setError('Results could not be saved. Export your data before closing this page.'));
+  }
+  useEffect(()=>{
+    if(session && timeLeft<=0) completeExam(session);
+    // Only timer expiry should trigger submission
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[timeLeft,session?.id]);
+
+  async function importFile(file:File|undefined){
+    if(!file)return;setError('');setNotice('');
+    if(file.size>MAX_FILE_BYTES){setError('File exceeds 5 MiB limit');return;}
+    setBusy(true);
+    try {
+      const raw:unknown=JSON.parse(await file.text());
+      const outcome=validateBank(raw);
+      if(outcome.errors.length){setError(outcome.errors.slice(0,12).join('\n')+(outcome.errors.length>12?'\n... more errors':''));return;}
+      const imported=outcome.bank!;
+      const existing=await db.banks.get(imported.bank_id);
+      if(existing && !window.confirm('Replace existing bank '+imported.bank_id+'? Previously completed attempts are preserved.'))return;
+      await db.banks.put(imported);await reload();setSelectedBank(imported.bank_id);
+      setNotice('Imported '+imported.questions.length+' questions into '+imported.title);
+      setPage('banks');
+    }catch(e){setError(e instanceof SyntaxError?'Invalid JSON file':e instanceof Error?e.message:'Import failed');}
+    finally{setBusy(false);}
+  }
+  async function deleteBank(id:string){
+    if(!window.confirm('Delete this local question bank? Completed attempts remain available.'))return;
+    await db.banks.delete(id);if(selectedBank===id)setSelectedBank('');await reload();
+  }
+  function startExam(){
+    if(!bank || !eligible.length)return;
+    const questions=shuffle(eligible).slice(0,Math.min(examSize,eligible.length));
+    const start=new Date().toISOString();
+    setViewResult(null);
+    setSession({
+      id:crypto.randomUUID(),bank,questions,answers:{},marked:[],index:0,startedAt:start,
+      durationSeconds:examMinutes*60,endsAt:Date.now()+examMinutes*60000
+    });
+    setNow(Date.now());setPage('exam');
+  }
+  function answer(id:string,option:string,multi:boolean){
+    setSession(old=>{
+      if(!old)return old;
+      const prev=old.answers[id]??[];
+      const next=multi?(prev.includes(option)?prev.filter(v=>v!==option):[...prev,option]):[option];
+      return {...old,answers:{...old.answers,[id]:next}};
+    });
+  }
+  function move(index:number){setSession(old=>old?{...old,index:Math.max(0,Math.min(old.questions.length-1,index))}:old);}
+  function flag(){setSession(old=>old?{...old,marked:old.marked.includes(old.questions[old.index].id)?old.marked.filter(x=>x!==old.questions[old.index].id):[...old.marked,old.questions[old.index].id]}:old);}
+  function saveJson(data:unknown,filename:string){
+    const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;a.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
+  async function backup(){saveJson({backup_version:1,exported_at:new Date().toISOString(),banks:await db.banks.toArray(),attempts:await db.attempts.toArray()},'examprep-backup-'+new Date().toISOString().slice(0,10)+'.json');}
+  async function restore(file:File|undefined){
+    if(!file)return;setError('');
+    if(file.size>MAX_FILE_BYTES*4){setError('Backup exceeds 20 MiB');return;}
+    try{
+      const raw:unknown=JSON.parse(await file.text());
+      if(!raw||typeof raw!=='object'||Array.isArray(raw)){throw new Error('Invalid backup');}
+      const data=raw as Record<string,unknown>;
+      if(data.backup_version!==1||!Array.isArray(data.banks)||!Array.isArray(data.attempts))throw new Error('Unsupported backup version');
+      if(data.banks.length>300||data.attempts.length>50000)throw new Error('Backup exceeds safety limits');
+      const validated=data.banks.map(validateBank);
+      if(validated.some(v=>v.errors.length))throw new Error('Backup contains invalid question banks');
+      const validAttempts=data.attempts.every(v=>v&&typeof v==='object'&&typeof v.id==='string'&&typeof v.bankId==='string'&&Array.isArray(v.questionSnapshots)&&typeof v.completedAt==='string');
+      if(!validAttempts)throw new Error('Backup contains invalid attempt records');
+      if(!window.confirm('Restore backup into this browser? Existing records with matching IDs will be replaced.'))return;
+      await db.transaction('rw',db.banks,db.attempts,async()=>{
+        await db.banks.bulkPut(validated.map(v=>v.bank!));
+        await db.attempts.bulkPut(data.attempts as Attempt[]);
+      });
+      await reload();setNotice('Backup restored successfully');
+    }catch(e){setError(e instanceof Error?e.message:'Restore failed');}
+  }
+  const totalQuestions=banks.reduce((sum,b)=>sum+b.questions.length,0);
+  const totalCorrect=attempts.reduce((sum,a)=>sum+a.correctCount,0);
+  const totalAttempted=attempts.reduce((sum,a)=>sum+a.total,0);
+  const domainStats=useMemo(()=>{
+    const m=new Map<string,{correct:number,total:number}>();
+    for(const a of attempts)for(const q of a.questionSnapshots){
+      const key=a.certification+' · '+q.domain;const record=m.get(key)??{correct:0,total:0};
+      record.total++;if(isCorrect(q,a.answers[q.id]??[]))record.correct++;m.set(key,record);
+    }
+    return [...m].map(([name,s])=>({name,...s})).sort((a,b)=>a.name.localeCompare(b.name));
+  },[attempts]);
+  return <div className="app">
+    <aside className="sidebar">
+      <div className="brand"><BookOpen size={26}/><div><strong>ExamPrep</strong><span>PERSONAL ENGINE</span></div></div>
+      <div className="nav">
+        {([['dashboard','Dashboard',BarChart3],['banks','Question Banks',Upload],['exam','Exam Simulator',Clock3],['analytics','Analytics',BarChart3]] as const).map(([id,label,Icon])=>
+          <button key={id} onClick={()=>{setPage(id);setError('');}} className={'navbtn '+(page===id?'active':'')}><Icon size={18}/>{label}</button>
+        )}
+      </div>
+      <div className="sidefoot"><ShieldCheck size={16}/> Local-first · v0.1.0<br/><small>No cloud sync. Backup regularly.</small></div>
+    </aside>
+    <main className="main">
+      <header className="top"><div><p className="eyebrow">EXAM PREPARATION WORKSPACE</p><h1>{page==='banks'?'Question Banks':page==='exam'?'Exam Simulator':page==='analytics'?'Learning Analytics':'Overview'}</h1></div><span className="tag">Browser-local storage</span></header>
+      {error&&<div role="alert" className="alert bad"><strong>Action required</strong><pre>{error}</pre><button onClick={()=>setError('')}>Dismiss</button></div>}
+      {notice&&<div role="status" className="alert good">{notice}<button onClick={()=>setNotice('')}>Dismiss</button></div>}
+      {session&&page!=='exam'&&<div className="alert warn">You have an examination in progress. <button onClick={()=>setPage('exam')}>Return to exam</button></div>}
+      {page==='dashboard'&&<div className="stack">
+        <section className="hero"><div><span className="hero-kicker">READY WHEN YOU ARE</span><h2>Build confidence, one question at a time.</h2><p>Import your own JSON question banks, practise under exam conditions and follow your progress. All questions and results stay in this browser.</p><button className="primary" onClick={()=>setPage('banks')}>Manage question banks →</button></div><div className="hero-art"><BookOpen size={84}/></div></section>
+        <section className="stats"><div className="stat"><span>Question banks</span><strong>{banks.length}</strong></div><div className="stat"><span>Questions available</span><strong>{totalQuestions}</strong></div><div className="stat"><span>Completed exams</span><strong>{attempts.length}</strong></div><div className="stat"><span>Average accuracy</span><strong>{pct(totalCorrect,totalAttempted)}%</strong></div></section>
+        <section className="panel"><div className="sectionhead"><h3>Recent exam sessions</h3><button className="subtle" onClick={()=>setPage('analytics')}>View analytics →</button></div>{attempts.length===0?<p className="empty">No results yet. Import a question bank and take your first practice exam.</p>:<div className="records">{attempts.slice(0,5).map(a=><button className="record" key={a.id} onClick={()=>{setViewResult(a);setPage('exam');}}><div><strong>{a.certification} — {a.bankTitle}</strong><small>{formatDate(a.completedAt)} · {a.total} questions</small></div><strong>{pct(a.correctCount,a.total)}%</strong></button>)}</div>}</section>
+      </div>}
+      {page==='banks'&&<div className="stack">
+        <section className="panel"><div className="sectionhead"><div><h3>Import a JSON question bank</h3><p className="muted">Validated locally. Files never leave your browser.</p></div><Upload size={24}/></div><label className="upload"><input type="file" accept=".json,application/json" disabled={busy} onChange={e=>{void importFile(e.target.files?.[0]);e.currentTarget.value='';}}/><Upload size={26}/><strong>{busy?'Importing…':'Choose a JSON file'}</strong><small>Maximum 5 MiB · Schema v1.0 · Up to 10,000 questions</small></label><p className="muted">Try the provided sample at <code>samples/demo-bank.json</code>. The importer rejects invalid answer keys, duplicate IDs and unsupported question types.</p></section>
+        <section className="panel"><div className="sectionhead"><h3>Imported banks</h3><span className="tag">{banks.length} banks</span></div>{banks.length===0?<p className="empty">No question banks imported yet.</p>:<div className="bankgrid">{banks.map(b=><div className="bankcard" key={b.bank_id}><span className="pill">{b.certification}</span><h4>{b.title}</h4><p>{b.questions.length} questions · {[...new Set(b.questions.map(q=>q.domain))].length} domains</p><div className="actions"><button className="primary small" onClick={()=>{setSelectedBank(b.bank_id);setDomain('ALL');setViewResult(null);setPage('exam');}}>Practise</button><button className="subtle small" onClick={()=>saveJson(b,b.bank_id+'.json')}><Download size={15}/> Export</button><button className="danger small" aria-label={'Delete '+b.title} onClick={()=>void deleteBank(b.bank_id)}><Trash2 size={15}/></button></div></div>)}</div>}</section>
+        <section className="panel"><div className="sectionhead"><h3>Data portability</h3><ShieldCheck size={20}/></div><p className="muted">Back up question banks and exam history before clearing browser data or switching devices. Backups in this release are NOT encrypted.</p><div className="actions"><button className="secondary" onClick={()=>void backup()}><Download size={16}/> Export complete backup</button><label className="buttonlike">Restore backup<input hidden type="file" accept=".json,application/json" onChange={e=>{void restore(e.target.files?.[0]);e.currentTarget.value='';}}/></label></div></section>
+      </div>}
+      {page==='exam'&&!session&&viewResult&&<div className="stack">
+        <button className="subtle back" onClick={()=>setViewResult(null)}><ArrowLeft size={16}/> Back to exam setup</button>
+        <section className="panel result"><CheckCircle2 size={38}/><p className="eyebrow">EXAM COMPLETE</p><h2>{pct(viewResult.correctCount,viewResult.total)}% accuracy</h2><p>{viewResult.correctCount} of {viewResult.total} questions correct · {viewResult.certification} · {viewResult.bankTitle}</p><p className="muted">Practice accuracy is not equivalent to an official certification scaled score.</p></section>
+        <section className="panel"><h3>Answer review</h3><div className="reviewlist">{viewResult.questionSnapshots.map((q,i)=><div key={q.id} className="review"><div className="sectionhead"><strong>{i+1}. {q.question}</strong><span className={'pill '+(isCorrect(q,viewResult.answers[q.id]??[])?'ok':'incorrect')}>{isCorrect(q,viewResult.answers[q.id]??[])?'Correct':'Incorrect'}</span></div>{q.options.map(o=><div className={'reviewoption '+(q.correct_answers.includes(o.id)?'correctoption':'')} key={o.id}><strong>{o.id}.</strong> {o.text}{q.correct_answers.includes(o.id)?' ✓':''}{(viewResult.answers[q.id]??[]).includes(o.id)?' · Your answer':''}</div>)}<p className="muted">{q.explanation}</p></div>)}</div></section>
+      </div>}
+      {page==='exam'&&!session&&!viewResult&&<div className="stack"><section className="panel">
+        <div className="sectionhead"><div><h3>Configure examination</h3><p className="muted">Generate a timed randomized practice paper.</p></div><Shuffle size={24}/></div>
+        {banks.length===0?<div className="empty">Import a question bank before starting. <button className="primary" onClick={()=>setPage('banks')}>Import questions</button></div>:<div className="formgrid">
+          <label>Question bank<select value={bank?.bank_id??''} onChange={e=>{setSelectedBank(e.target.value);setDomain('ALL');}}>{banks.map(b=><option key={b.bank_id} value={b.bank_id}>{b.certification} — {b.title}</option>)}</select></label>
+          <label>Domain<select value={domain} onChange={e=>setDomain(e.target.value)}><option value="ALL">All domains</option>{domains.map(d=><option key={d} value={d}>{d}</option>)}</select></label>
+          <label>Number of questions<input type="number" min="1" max={Math.max(1,eligible.length)} value={examSize} onChange={e=>setExamSize(Math.max(1,Math.min(10000,Number(e.target.value)||1)))}/></label>
+          <label>Duration (minutes)<input type="number" min="1" max="300" value={examMinutes} onChange={e=>setExamMinutes(Math.max(1,Math.min(300,Number(e.target.value)||1)))}/></label>
+          <div className="full muted">{eligible.length} questions available in selected domain. An exam samples without replacement.</div>
+          <button className="primary full" disabled={!eligible.length} onClick={startExam}><Play size={18}/> Start examination</button>
+        </div>}
+      </section></div>}
+      {page==='exam'&&session&&(()=>{const q=session.questions[session.index];const picked=session.answers[q.id]??[];return <div className="stack">
+        <section className="examtoolbar"><div><span className="eyebrow">{session.bank.certification} · {q.domain}</span><strong>Question {session.index+1} of {session.questions.length}</strong></div><div className={'timer '+(timeLeft<60?'urgent':'')}><Clock3 size={18}/> {fmtTime(timeLeft)}</div></section>
+        <div className="progress"><div style={{width:(session.index+1)/session.questions.length*100+'%'}}/></div>
+        <section className="panel questionpanel"><div className="sectionhead"><span className="pill">{q.type==='multiple_choice'?'Select all that apply':'Select one answer'}</span><button className="subtle" onClick={flag}><Flag size={16}/> {session.marked.includes(q.id)?'Unflag':'Flag'}</button></div><h2>{q.question}</h2><div className="choices">{q.options.map(o=><label className={'choice '+(picked.includes(o.id)?'selected':'')} key={o.id}><input type={q.type==='multiple_choice'?'checkbox':'radio'} name={'choice-'+q.id} checked={picked.includes(o.id)} onChange={()=>answer(q.id,o.id,q.type==='multiple_choice')}/><span className="letter">{o.id}</span><span>{o.text}</span></label>)}</div></section>
+        <section className="panel"><div className="sectionhead"><h3>Question navigator</h3><span className="muted">{Object.keys(session.answers).filter(k=>(session.answers[k]??[]).length).length} answered</span></div><div className="numbergrid">{session.questions.map((item,i)=><button key={item.id} title={'Question '+(i+1)} className={'num '+(i===session.index?'current ':'')+((session.answers[item.id]??[]).length?'answered ':'')+(session.marked.includes(item.id)?'flagged':'')} onClick={()=>move(i)}>{i+1}</button>)}</div><div className="actions spread"><button className="secondary" disabled={session.index===0} onClick={()=>move(session.index-1)}>← Previous</button><button className="secondary" disabled={session.index===session.questions.length-1} onClick={()=>move(session.index+1)}>Next →</button></div><div className="examend"><button className="danger" onClick={()=>{if(window.confirm('Submit exam now? Unanswered questions will be marked incorrect.'))completeExam(session);}}>Submit exam</button></div></section>
+      </div>;})()}
+      {page==='analytics'&&<div className="stack">
+        <section className="stats"><div className="stat"><span>Completed exams</span><strong>{attempts.length}</strong></div><div className="stat"><span>Questions answered</span><strong>{totalAttempted}</strong></div><div className="stat"><span>Total correct</span><strong>{totalCorrect}</strong></div><div className="stat"><span>Overall accuracy</span><strong>{pct(totalCorrect,totalAttempted)}%</strong></div></section>
+        <section className="panel"><h3>Domain performance</h3>{domainStats.length===0?<p className="empty">Take an exam to view your performance by domain.</p>:<div className="domains">{domainStats.map(d=><div key={d.name} className="domainrow"><div className="sectionhead"><strong>{d.name}</strong><span>{d.correct}/{d.total} · {pct(d.correct,d.total)}%</span></div><div className="meter"><div style={{width:pct(d.correct,d.total)+'%'}}/></div></div>)}</div>}</section>
+        <section className="panel"><h3>Exam history</h3>{attempts.length===0?<p className="empty">No completed attempts yet.</p>:<div className="records">{attempts.map(a=><button className="record" key={a.id} onClick={()=>{setViewResult(a);setPage('exam');}}><div><strong>{a.certification} — {a.bankTitle}</strong><small>{formatDate(a.completedAt)} · {a.total} questions</small></div><strong>{pct(a.correctCount,a.total)}%</strong></button>)}</div>}</section>
+        <section className="panel"><h3>Backup and recovery</h3><p className="muted">Export exam history and all banks as JSON. This file is unencrypted; protect it yourself.</p><button className="secondary" onClick={()=>void backup()}><Download size={16}/> Export backup</button></section>
+      </div>}
+      <footer>ExamPrep Engine v0.1.0 · Your data stays in this browser · Not affiliated with certification providers</footer>
+    </main>
+  </div>;
+}
