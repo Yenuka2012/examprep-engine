@@ -104,5 +104,6 @@ test('IndexedDB version 1 bank records migrate to version 2 without data loss',a
       count.onerror=()=>{reject(count.error);database.close();};
     };
   }));
-  expect(state).toEqual({version:2,bankCount:1,sessionStore:true});
+  // Dexie maps schema version 2 to native IndexedDB version 20.
+  expect(state).toEqual({version:20,bankCount:1,sessionStore:true});
 });
