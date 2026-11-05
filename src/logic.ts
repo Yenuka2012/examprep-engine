@@ -1,43 +1,80 @@
+import Ajv from 'ajv';
 import type { Question, QuestionBank } from './types';
-const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
-export function validateBank(data: unknown): {bank?: QuestionBank; errors: string[]} {
-  const errors: string[] = [];
-  if (!isObj(data)) return {errors:['Root must be a JSON object']};
-  for (const key of ['schema_version','bank_id','title','certification']) {
-    if (typeof data[key] !== 'string' || !(data[key] as string).trim()) errors.push(key + ' must be a non-empty string');
+
+const questionSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['id','type','domain','question','options','correct_answers','explanation'],
+  properties: {
+    id: {type:'string', pattern:'^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$'},
+    type: {enum:['single_choice','multiple_choice']},
+    domain: {type:'string', minLength:1, maxLength:120},
+    topic: {type:'string', maxLength:160},
+    difficulty: {enum:['easy','medium','hard']},
+    question: {type:'string', minLength:1, maxLength:10000},
+    options: {
+      type:'array', minItems:2, maxItems:8,
+      items: {
+        type:'object', additionalProperties:false, required:['id','text'],
+        properties: {
+          id: {type:'string', pattern:'^[A-Za-z0-9][A-Za-z0-9_-]{0,15}$'},
+          text: {type:'string', minLength:1, maxLength:5000}
+        }
+      }
+    },
+    correct_answers: {type:'array', minItems:1, maxItems:8, uniqueItems:true, items:{type:'string'}},
+    explanation: {type:'string', minLength:1, maxLength:20000},
+    tags: {type:'array', maxItems:30, uniqueItems:true, items:{type:'string', minLength:1, maxLength:60}}
   }
-  if (data.schema_version !== '1.0') errors.push('Unsupported schema_version (expected 1.0)');
-  if (!Array.isArray(data.questions) || data.questions.length === 0) errors.push('questions must be a non-empty array');
-  if (Array.isArray(data.questions) && data.questions.length > 10000) errors.push('Maximum 10,000 questions per bank');
-  const seen = new Set<string>();
-  if (Array.isArray(data.questions)) data.questions.slice(0,10000).forEach((raw,i) => {
-    const p = 'questions['+i+']';
-    if (!isObj(raw)) {errors.push(p+' must be an object'); return;}
-    if (typeof raw.id !== 'string' || !raw.id.trim()) errors.push(p+'.id missing');
-    else if (seen.has(raw.id)) errors.push(p+'.id duplicated: '+raw.id);
-    else seen.add(raw.id);
-    if (!['single_choice','multiple_choice'].includes(String(raw.type))) errors.push(p+'.type invalid');
-    for (const key of ['domain','question','explanation']) if (typeof raw[key] !== 'string' || !(raw[key] as string).trim()) errors.push(p+'.'+key+' missing');
-    if (!Array.isArray(raw.options) || raw.options.length < 2 || raw.options.length > 8) {errors.push(p+'.options must contain 2–8 choices');return;}
-    const optionIds = new Set<string>();
-    raw.options.forEach((o,j) => {
-      if (!isObj(o) || typeof o.id !== 'string' || !o.id.trim() || typeof o.text !== 'string' || !o.text.trim()) errors.push(p+'.options['+j+'] invalid');
-      else if (optionIds.has(o.id)) errors.push(p+'.options duplicate ID');
-      else optionIds.add(o.id);
-    });
-    if (!Array.isArray(raw.correct_answers) || !raw.correct_answers.length || raw.correct_answers.some(a=>typeof a !== 'string' || !optionIds.has(a)) || new Set(raw.correct_answers).size !== raw.correct_answers.length) errors.push(p+'.correct_answers invalid');
-    if (raw.type === 'single_choice' && Array.isArray(raw.correct_answers) && raw.correct_answers.length !== 1) errors.push(p+' single_choice requires exactly one answer');
-    if (raw.type === 'multiple_choice' && Array.isArray(raw.correct_answers) && raw.correct_answers.length < 2) errors.push(p+' multiple_choice requires at least two correct answers');
-  });
-  return errors.length ? {errors} : {bank: data as QuestionBank, errors};
+} as const;
+
+const schema = {
+  type:'object',
+  additionalProperties:false,
+  required:['schema_version','bank_id','title','certification','questions'],
+  properties:{
+    schema_version:{const:'1.0'},
+    bank_id:{type:'string',pattern:'^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$'},
+    title:{type:'string',minLength:1,maxLength:160},
+    certification:{type:'string',minLength:1,maxLength:80},
+    syllabus_version:{type:'string',maxLength:80},
+    questions:{type:'array',minItems:1,maxItems:10000,items:questionSchema}
+  }
+} as const;
+
+const ajv = new Ajv({allErrors:true,strict:true});
+const checkSchema = ajv.compile(schema);
+
+export function validateBank(data:unknown):{bank?:QuestionBank;errors:string[]} {
+  if(!checkSchema(data)){
+    return {errors:(checkSchema.errors??[]).slice(0,100).map(e=>
+      (e.instancePath || 'root')+' '+(e.message??'invalid')+
+      (e.params && 'additionalProperty' in e.params?' ('+String(e.params.additionalProperty)+')':'')
+    )};
+  }
+  const bank=data as QuestionBank;
+  const errors:string[]=[];
+  const ids=new Set<string>();
+  for (const [i,q] of bank.questions.entries()){
+    const prefix='questions['+i+']';
+    if(ids.has(q.id)) errors.push(prefix+'.id duplicated');
+    ids.add(q.id);
+    const opts=new Set(q.options.map(o=>o.id));
+    if(opts.size!==q.options.length)errors.push(prefix+'.options duplicate IDs');
+    if(q.correct_answers.some(a=>!opts.has(a)))errors.push(prefix+'.correct_answers references a missing option');
+    if(q.type==='single_choice'&&q.correct_answers.length!==1)errors.push(prefix+'.single_choice requires one answer');
+    if(q.type==='multiple_choice'&&q.correct_answers.length<2)errors.push(prefix+'.multiple_choice requires two or more answers');
+    if(errors.length>=100) break;
+  }
+  return errors.length?{errors}:{bank,errors:[]};
 }
-export function isCorrect(question: Question, selected: string[]): boolean {
-  const a = [...new Set(selected)].sort(); const b = [...question.correct_answers].sort();
-  return a.length === b.length && a.every((v,i)=>v === b[i]);
+export function isCorrect(question:Question,selected:string[]):boolean{
+  const a=[...new Set(selected)].sort();
+  const b=[...question.correct_answers].sort();
+  return a.length===b.length&&a.every((v,i)=>v===b[i]);
 }
-export function shuffle<T>(items: T[]): T[] {
-  const a = [...items];
-  for (let i=a.length-1;i>0;i--) {const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}
+export function shuffle<T>(items:T[]):T[]{
+  const a=[...items];
+  for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}
   return a;
 }
-export function csvCell(v: string): string {return '"'+v.replace(/"/g,'""')+'"';}
