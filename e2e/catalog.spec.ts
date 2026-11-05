@@ -1,0 +1,67 @@
+import {test,expect} from '@playwright/test';
+import {readFile} from 'node:fs/promises';
+
+async function createCatalog(page:import('@playwright/test').Page){
+  await page.getByRole('button',{name:'Certifications'}).click();
+  await page.getByLabel('Certification ID').fill('DEMO');
+  await page.getByLabel('Certification name').fill('Synthetic Fundamentals');
+  await page.getByLabel('Certification provider').fill('Independent Test Provider');
+  await page.getByRole('button',{name:'Add certification'}).click();
+  await expect(page.getByText(/Certification profile added/)).toBeVisible();
+  await page.getByLabel('Syllabus version ID').fill('2026');
+  await page.getByLabel('Syllabus title').fill('Synthetic 2026 syllabus');
+  await page.getByLabel('Domain 1 name').fill('Engineering');
+  await page.getByRole('button',{name:'Save new draft'}).click();
+  await expect(page.getByText(/Syllabus draft saved/)).toBeVisible();
+}
+test('M1.1 non-destructive migration, draft publication, persisted versions and matching banks',async({page})=>{
+  await page.goto('/examprep-engine/');
+  await page.getByRole('button',{name:'Question Banks'}).click();
+  await page.locator('input[type="file"]').first().setInputFiles('samples/demo-bank.json');
+  await expect(page.getByText('Cybersecurity Fundamentals Demo').first()).toBeVisible();
+  await createCatalog(page);
+  await expect(page.getByText(/1 matching local banks/)).toBeVisible();
+  page.once('dialog',dialog=>dialog.accept());
+  await page.getByRole('button',{name:'Publish',exact:true}).click();
+  await expect(page.getByText(/published as an immutable syllabus/)).toBeVisible();
+  await expect(page.getByText(/Immutable v2/)).toBeVisible();
+  await expect(page.getByRole('button',{name:'Edit draft'})).toHaveCount(0);
+  await page.reload();
+  await page.getByRole('button',{name:'Certifications'}).click();
+  await page.getByLabel('Catalog certification').selectOption('DEMO');
+  await expect(page.getByText('Synthetic 2026 syllabus')).toBeVisible();
+  await expect(page.getByText(/1 matching local banks/)).toBeVisible();
+  await page.getByRole('button',{name:'Question Banks'}).click();
+  await expect(page.getByText('Cybersecurity Fundamentals Demo').first()).toBeVisible();
+});
+test('M1.1 encrypted full backup includes catalog and restores into a fresh profile',async({page,browser})=>{
+  await page.goto('/examprep-engine/');
+  await createCatalog(page);
+  await page.getByRole('button',{name:'Question Banks'}).click();
+  await page.getByPlaceholder('Enter a strong unique passphrase').fill('m1-full-backup-secret-long-passphrase');
+  const downloading=page.waitForEvent('download');
+  await page.getByRole('button',{name:'Export encrypted backup'}).first().click();
+  const output=await downloading;
+  const raw=await readFile(await output.path(),'utf8');
+  expect(raw).not.toContain('Synthetic Fundamentals');
+  expect(raw).not.toContain('Synthetic 2026 syllabus');
+  const json=JSON.parse(raw);
+  expect(json.format).toBe('examprep-encrypted-backup-v1');
+  expect(json).not.toHaveProperty('certifications');
+
+  const context=await browser.newContext({acceptDownloads:true});
+  try{
+    const recovered=await context.newPage();
+    await recovered.goto('/examprep-engine/');
+    await recovered.getByRole('button',{name:'Question Banks'}).click();
+    await recovered.getByPlaceholder('Enter a strong unique passphrase').fill('m1-full-backup-secret-long-passphrase');
+    recovered.on('dialog',dialog=>dialog.accept());
+    await recovered.getByLabel('Restore encrypted or legacy backup').setInputFiles({
+      name:'encrypted-catalog.json',mimeType:'application/json',buffer:Buffer.from(raw)
+    });
+    await expect(recovered.getByText(/1 certifications and 1 syllabi imported/)).toBeVisible();
+    await recovered.getByRole('button',{name:'Certifications'}).click();
+    await recovered.getByLabel('Catalog certification').selectOption('DEMO');
+    await expect(recovered.getByText('Synthetic 2026 syllabus')).toBeVisible();
+  }finally{await context.close();}
+});
