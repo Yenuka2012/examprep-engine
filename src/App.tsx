@@ -3,7 +3,7 @@ import { BookOpen, Upload, BarChart3, ShieldCheck, Download, Trash2, ArrowLeft, 
 import { db } from './db';
 import { isCorrect, shuffle, validateBank } from './logic';
 import { encryptBackup, decryptBackup, isEncryptedBackup, type EncryptedBackup } from './crypto';
-import type { Attempt, ExamSession, Question, QuestionBank } from './types';
+import type { Attempt, ExamSession, QuestionBank } from './types';
 
 type Page = 'dashboard' | 'banks' | 'exam' | 'analytics';
 const SESSION_KEY = 'examprep-active-session-v1';
