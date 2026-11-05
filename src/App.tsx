@@ -251,7 +251,7 @@ export default function App() {
       const selectedSyllabus=profile&&selected.syllabus_version?
         await db.syllabusVersions.get(profile.id+'/'+selected.syllabus_version):undefined;
       const encrypted=await encryptBackup({
-        backup_version:1,exported_at:new Date().toISOString(),banks:[selected],attempts:[],
+        backup_version:2,exported_at:new Date().toISOString(),banks:[selected],attempts:[],
         certifications:profile?[profile]:[],
         syllabi:selectedSyllabus?[selectedSyllabus]:[]
       },backupPassphrase);
@@ -264,7 +264,7 @@ export default function App() {
     if(busy)return;
     setError('');setBusy(true);
     try{
-      const data={backup_version:1,exported_at:new Date().toISOString(),
+      const data={backup_version:2,exported_at:new Date().toISOString(),
         banks:await db.banks.toArray(),attempts:await db.attempts.toArray(),
         certifications:await db.certifications.toArray(),syllabi:await db.syllabusVersions.toArray()};
       const encrypted=await encryptBackup(data,backupPassphrase);
