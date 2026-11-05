@@ -59,7 +59,11 @@ test('offline install, exam navigation and private-data cache isolation',async({
     await page.getByRole('radio').first().check();
     await page.getByRole('button',{name:'Flag'}).click();
     await expect(page.getByRole('button',{name:'Unflag'})).toBeVisible();
-  }finally{await context.setOffline(false);}
+  }finally{
+    // Test timeout can close the page before teardown. Keep the primary failure
+    // instead of replacing it with a secondary offline-reset exception.
+    if(!page.isClosed())await context.setOffline(false);
+  }
 });
 
 test('PWA worker is installed within the expected application scope',async({page})=>{

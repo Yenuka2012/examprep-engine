@@ -12,7 +12,10 @@ async function importSample(page:Page){
 }
 async function startExam(page:Page){
   await page.getByRole('button',{name:'Practise'}).first().click();
-  await page.getByRole('button',{name:'Start examination'}).click();
+  const start=page.getByRole('button',{name:'Start examination'});
+  await expect(start).toBeVisible();
+  await expect(start).toBeEnabled();
+  await start.click();
   await expect(page.getByText(/Question 1 of/)).toBeVisible();
 }
 test('exam recovers progress and deadline after hard reload',async({page})=>{

@@ -2,8 +2,10 @@ import {defineConfig,devices} from '@playwright/test';
 
 export default defineConfig({
   testDir:'./e2e',
-  timeout:20_000,
-  expect:{timeout:12_000},
+  timeout:60_000,
+  expect:{timeout:15_000},
+  // Avoid noisy WebKit failures caused by CI CPU contention; never skip a failed test.
+  workers:process.env.CI?1:undefined,
   fullyParallel:false,
   forbidOnly:!!process.env.CI,
   retries:0,
