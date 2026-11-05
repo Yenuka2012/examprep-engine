@@ -370,7 +370,7 @@ export default function App() {
         <section className="panel"><h3>Exam history</h3>{attempts.length===0?<p className="empty">No completed attempts yet.</p>:<div className="records">{attempts.map(a=><button className="record" key={a.id} onClick={()=>{setViewResult(a);setPage('exam');}}><div><strong>{a.certification} — {a.bankTitle}</strong><small>{formatDate(a.completedAt)} · {a.total} questions</small></div><strong>{pct(a.correctCount,a.total)}%</strong></button>)}</div>}</section>
         <section className="panel"><h3>Backup and recovery</h3><p className="muted">Export exam history and banks encrypted with a strong passphrase using AES-256-GCM.</p><label className="backup-passphrase">Backup passphrase<input autoComplete="new-password" type="password" value={backupPassphrase} onChange={e=>setBackupPassphrase(e.target.value)} placeholder="At least 12 characters" /></label><button className="secondary" disabled={backupPassphrase.length<12||busy} onClick={()=>void backup()}><Download size={16}/> Export encrypted backup</button></section>
       </div>}
-      <footer>ExamPrep Engine v0.2.1 · Your data stays in this browser · Not affiliated with certification providers</footer>
+      <footer>ExamPrep Engine v0.3.0-rc.1 · Your data stays in this browser · Not affiliated with certification providers</footer>
     </main>
   </div>;
 }
