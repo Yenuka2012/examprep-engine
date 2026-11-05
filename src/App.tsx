@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ExamLock } from './examLock';
+import PwaStatus from './PwaStatus';
 import { completeActiveExam, createActiveExam, loadActiveExam, saveActiveExam } from './examPersistence';
 import { BookOpen, Upload, BarChart3, ShieldCheck, Download, Trash2, ArrowLeft, CheckCircle2, Clock3, Flag, Shuffle, Play } from 'lucide-react';
 import { db } from './db';
 import { isCorrect, shuffle, validateBank } from './logic';
-import { encryptBackup, decryptBackup, isEncryptedBackup, type EncryptedBackup } from './crypto';
-import { validateBackupData } from './backup';
+import { encryptBackup } from './crypto';
+import { decodeBackup, restoreBackup, requestPersistentStorage } from './recovery';
 import type { Attempt, ExamSession, QuestionBank } from './types';
 
 type Page = 'dashboard' | 'banks' | 'exam' | 'analytics';
@@ -34,6 +35,7 @@ export default function App() {
   const [notice,setNotice]=useState('');
   const [busy,setBusy]=useState(false);
   const [backupPassphrase,setBackupPassphrase]=useState('');
+  const [persistenceStatus,setPersistenceStatus]=useState<'unknown'|'granted'|'denied'|'unsupported'>('unknown');
   const [now,setNow]=useState(Date.now());
 
   async function reload(){setBanks(await db.banks.toArray());setAttempts((await db.attempts.toArray()).sort((a,b)=>b.completedAt.localeCompare(a.completedAt)));}
@@ -197,23 +199,25 @@ export default function App() {
     finally{setBackupPassphrase('');}
   }
   async function restore(file:File|undefined){
-    if(!file)return;setError('');
+    if(!file)return;setError('');setNotice('');
     if(file.size>MAX_FILE_BYTES*4){setError('Backup exceeds 20 MiB');return;}
+    setBusy(true);
     try{
       const raw:unknown=JSON.parse(await file.text());
-      if(!isEncryptedBackup(raw))throw new Error('Only encrypted v1 backups can be restored. Unencrypted legacy backups must be migrated separately.');
-      if(!backupPassphrase)throw new Error('Enter the backup passphrase before restoring');
-      const decrypted=await decryptBackup(raw as EncryptedBackup,backupPassphrase);
-      if(!decrypted||typeof decrypted!=='object'||Array.isArray(decrypted)){throw new Error('Invalid decrypted backup');}
-      const validated=validateBackupData(decrypted);
-      if(!window.confirm('Restore backup into this browser? Existing records with matching IDs will be replaced.'))return;
-      await db.transaction('rw',db.banks,db.attempts,async()=>{
-        await db.banks.bulkPut(validated.banks);
-        await db.attempts.bulkPut(validated.attempts);
-      });
-      await reload();setNotice('Backup restored successfully');
+      const decoded=await decodeBackup(raw,backupPassphrase);
+      if(decoded.kind==='legacy-plaintext' &&
+         !window.confirm('This is an UNENCRYPTED legacy backup. Its contents were stored in plaintext. Restore validated data without overwriting existing records? After restoration, create a new encrypted backup and securely remove old plaintext copies.'))return;
+      if(!window.confirm('Merge '+decoded.data.banks.length+' question banks and '+decoded.data.attempts.length+' attempts into this browser? Existing identical records are kept; conflicting IDs will abort the entire restore. An unfinished exam must be completed first.'))return;
+      const result=await restoreBackup(decoded.data);
+      await reload();
+      setNotice('Recovery complete: '+result.banksAdded+' new banks and '+result.attemptsAdded+' new attempts. Existing records preserved.'+(decoded.kind==='legacy-plaintext'?' Export an encrypted replacement backup now.':''));
     }catch(e){setError(e instanceof Error?e.message:'Restore failed');}
-    finally{setBackupPassphrase('');}
+    finally{setBackupPassphrase('');setBusy(false);}
+  }
+  async function enablePersistentStorage(){
+    const status=await requestPersistentStorage();
+    setPersistenceStatus(status);
+    setNotice(status==='granted'?'Persistent browser storage granted; encrypted backups are still essential.':status==='denied'?'Persistent storage was not granted. Back up regularly.':'Persistent storage API is not supported in this browser.');
   }
   const totalQuestions=banks.reduce((sum,b)=>sum+b.questions.length,0);
   const totalCorrect=attempts.reduce((sum,a)=>sum+a.correctCount,0);
@@ -238,6 +242,7 @@ export default function App() {
     </aside>
     <main className="main">
       <header className="top"><div><p className="eyebrow">EXAM PREPARATION WORKSPACE</p><h1>{page==='banks'?'Question Banks':page==='exam'?'Exam Simulator':page==='analytics'?'Learning Analytics':'Overview'}</h1></div><span className="tag">Browser-local storage</span></header>
+      <PwaStatus/>
       {error&&<div role="alert" className="alert bad"><strong>Action required</strong><pre>{error}</pre><button onClick={()=>setError('')}>Dismiss</button></div>}
       {notice&&<div role="status" className="alert good">{notice}<button onClick={()=>setNotice('')}>Dismiss</button></div>}
       {session&&page!=='exam'&&<div className="alert warn">{examAccess==='owner'?'You have an examination in progress.':'An examination is saved but this tab is not its active owner.'} <button onClick={()=>setPage('exam')}>View exam status</button></div>}
@@ -249,7 +254,7 @@ export default function App() {
       {page==='banks'&&<div className="stack">
         <section className="panel"><div className="sectionhead"><div><h3>Import a JSON question bank</h3><p className="muted">Validated locally. Files never leave your browser.</p></div><Upload size={24}/></div><label className="upload"><input type="file" accept=".json,application/json" disabled={busy} onChange={e=>{void importFile(e.target.files?.[0]);e.currentTarget.value='';}}/><Upload size={26}/><strong>{busy?'Importing…':'Choose a JSON file'}</strong><small>Maximum 5 MiB · Schema v1.0 · Up to 10,000 questions</small></label><p className="muted">Try the provided sample at <code>samples/demo-bank.json</code>. The importer rejects invalid answer keys, duplicate IDs and unsupported question types.</p></section>
         <section className="panel"><div className="sectionhead"><h3>Imported banks</h3><span className="tag">{banks.length} banks</span></div>{banks.length===0?<p className="empty">No question banks imported yet.</p>:<div className="bankgrid">{banks.map(b=><div className="bankcard" key={b.bank_id}><span className="pill">{b.certification}</span><h4>{b.title}</h4><p>{b.questions.length} questions · {[...new Set(b.questions.map(q=>q.domain))].length} domains</p><div className="actions"><button className="primary small" onClick={()=>{setSelectedBank(b.bank_id);setDomain('ALL');setViewResult(null);setPage('exam');}}>Practise</button><button className="subtle small" onClick={()=>saveJson(b,b.bank_id+'.json')}><Download size={15}/> Export</button><button className="danger small" aria-label={'Delete '+b.title} onClick={()=>void deleteBank(b.bank_id)}><Trash2 size={15}/></button></div></div>)}</div>}</section>
-        <section className="panel"><div className="sectionhead"><h3>Data portability</h3><ShieldCheck size={20}/></div><p className="muted">Encrypt full backups with AES-256-GCM. Your passphrase is never stored. Losing it means losing access to the backup. Browser IndexedDB remains unencrypted.</p><label className="backup-passphrase">Backup passphrase (at least 12 characters)<input autoComplete="new-password" type="password" value={backupPassphrase} onChange={e=>setBackupPassphrase(e.target.value)} placeholder="Enter a strong unique passphrase" /></label><div className="actions"><button className="secondary" disabled={backupPassphrase.length<12} onClick={()=>void backup()}><Download size={16}/> Export encrypted backup</button><label className="buttonlike">Restore backup<input hidden type="file" accept=".json,application/json" onChange={e=>{void restore(e.target.files?.[0]);e.currentTarget.value='';}}/></label></div></section>
+        <section className="panel"><div className="sectionhead"><h3>Data portability</h3><ShieldCheck size={20}/></div><p className="muted">Encrypt full backups with AES-256-GCM. Your passphrase is never stored. Losing it means losing access to the backup. Browser IndexedDB remains unencrypted.</p><label className="backup-passphrase">Backup passphrase (at least 12 characters)<input autoComplete="new-password" type="password" value={backupPassphrase} onChange={e=>setBackupPassphrase(e.target.value)} placeholder="Enter a strong unique passphrase" /></label><div className="actions"><button className="secondary" disabled={backupPassphrase.length<12} onClick={()=>void backup()}><Download size={16}/> Export encrypted backup</button><label className="buttonlike">Restore encrypted or legacy backup<input hidden type="file" disabled={busy} accept=".json,application/json" onChange={e=>{void restore(e.target.files?.[0]);e.currentTarget.value='';}}/></label><button className="secondary" disabled={busy} onClick={()=>void enablePersistentStorage()}>Request persistent storage</button></div><p className="muted">Restore is merge-only: existing records are never silently replaced. Legacy plaintext backup files are accepted only after explicit warning. Browser storage persistence: {persistenceStatus}. Active exams are excluded from backup; complete the exam first.</p></section>
       </div>}
       {page==='exam'&&!session&&viewResult&&<div className="stack">
         <button className="subtle back" onClick={()=>setViewResult(null)}><ArrowLeft size={16}/> Back to exam setup</button>
