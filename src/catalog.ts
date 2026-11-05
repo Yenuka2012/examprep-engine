@@ -74,6 +74,7 @@ export function validateSyllabus(raw:unknown):SyllabusVersion{
   if(raw.status==='draft' && raw.publishedAt!==undefined)throw new Error('Draft cannot have a publication timestamp');
   if(raw.status==='published' && raw.publishedAt===undefined)throw new Error('Published syllabus must have a publication timestamp');
   const publishedAt=raw.status==='published'?utc(raw.publishedAt,'publication timestamp'):undefined;
+  if(publishedAt&&Date.parse(publishedAt)<Date.parse(createdAt))throw new Error('Publication precedes creation');
   return {
     id:syllabusKey(certificationId,version),certificationId,version,
     title:bounded(raw.title,160,'Syllabus title'),domains,status:raw.status,
