@@ -7,3 +7,4 @@ coverage/
 .DS_Store
 private-question-banks/
 *.backup.json
+\ntest-results/\nplaywright-report/\n
