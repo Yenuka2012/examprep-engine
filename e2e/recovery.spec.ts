@@ -46,7 +46,7 @@ test('encrypted backup restores into a fresh browser profile after local storage
   const downloaded=page.waitForEvent('download');
   await page.getByRole('button',{name:'Export encrypted backup'}).click();
   const backup=await downloaded;
-  const buffer=Buffer.from(await import('node:fs/promises').then(fs=>fs.readFile(backup.path())));
+  const buffer=await (await import('node:fs/promises')).readFile(await backup.path());
   // New isolated browser context simulates an empty/evicted browser profile.
   const fresh=await browser.newContext({acceptDownloads:true});
   try{
