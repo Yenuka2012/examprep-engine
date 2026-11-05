@@ -3,15 +3,16 @@ import { ExamLock } from './examLock';
 import { SessionSaveQueue } from './saveQueue';
 import {assertRestorableBackupSize,MAX_BACKUP_FILE_BYTES} from './backupSize';
 import PwaStatus from './PwaStatus';
+import CatalogPanel from './CatalogPanel';
 import { completeActiveExam, createActiveExam, loadActiveExam, saveActiveExam } from './examPersistence';
-import { BookOpen, Upload, BarChart3, ShieldCheck, Download, Trash2, ArrowLeft, CheckCircle2, Clock3, Flag, Shuffle, Play } from 'lucide-react';
+import { BookOpen, BookMarked, Upload, BarChart3, ShieldCheck, Download, Trash2, ArrowLeft, CheckCircle2, Clock3, Flag, Shuffle, Play } from 'lucide-react';
 import { db } from './db';
 import { isCorrect, shuffle, validateBank } from './logic';
 import { encryptBackup, type EncryptedBackup } from './crypto';
 import { decodeBackup, restoreBackup, requestPersistentStorage } from './recovery';
 import type { Attempt, ExamSession, QuestionBank } from './types';
 
-type Page = 'dashboard' | 'banks' | 'exam' | 'analytics';
+type Page = 'dashboard' | 'banks' | 'catalog' | 'exam' | 'analytics';
 const SESSION_KEY = 'examprep-active-session-v1';
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const AUTOSAVE_ERROR = 'Exam autosave failed. Your newest changes may not be stored. Retry saving before closing this tab.';
@@ -299,14 +300,14 @@ export default function App() {
     <aside className="sidebar">
       <div className="brand"><BookOpen size={26}/><div><strong>ExamPrep</strong><span>PERSONAL ENGINE</span></div></div>
       <div className="nav">
-        {([['dashboard','Dashboard',BarChart3],['banks','Question Banks',Upload],['exam','Exam Simulator',Clock3],['analytics','Analytics',BarChart3]] as const).map(([id,label,Icon])=>
+        {([['dashboard','Dashboard',BarChart3],['banks','Question Banks',Upload],['catalog','Certifications',BookMarked],['exam','Exam Simulator',Clock3],['analytics','Analytics',BarChart3]] as const).map(([id,label,Icon])=>
           <button key={id} onClick={()=>{setPage(id);setError('');}} className={'navbtn '+(page===id?'active':'')}><Icon size={18}/>{label}</button>
         )}
       </div>
       <div className="sidefoot"><ShieldCheck size={16}/> Local-first · v0.2.1<br/><small>No cloud sync. Backup regularly.</small></div>
     </aside>
     <main className="main">
-      <header className="top"><div><p className="eyebrow">EXAM PREPARATION WORKSPACE</p><h1>{page==='banks'?'Question Banks':page==='exam'?'Exam Simulator':page==='analytics'?'Learning Analytics':'Overview'}</h1></div><span className="tag">Browser-local storage</span></header>
+      <header className="top"><div><p className="eyebrow">EXAM PREPARATION WORKSPACE</p><h1>{page==='banks'?'Question Banks':page==='catalog'?'Certifications & Syllabi':page==='exam'?'Exam Simulator':page==='analytics'?'Learning Analytics':'Overview'}</h1></div><span className="tag">Browser-local storage</span></header>
       <PwaStatus/>
       {error&&<div role="alert" className="alert bad"><strong>Action required</strong><pre>{error}</pre><button onClick={()=>setError('')}>Dismiss</button></div>}
       {notice&&<div role="status" className="alert good">{notice}<button onClick={()=>setNotice('')}>Dismiss</button></div>}
@@ -316,6 +317,7 @@ export default function App() {
         <section className="stats"><div className="stat"><span>Question banks</span><strong>{banks.length}</strong></div><div className="stat"><span>Questions available</span><strong>{totalQuestions}</strong></div><div className="stat"><span>Completed exams</span><strong>{attempts.length}</strong></div><div className="stat"><span>Average accuracy</span><strong>{pct(totalCorrect,totalAttempted)}%</strong></div></section>
         <section className="panel"><div className="sectionhead"><h3>Recent exam sessions</h3><button className="subtle" onClick={()=>setPage('analytics')}>View analytics →</button></div>{attempts.length===0?<p className="empty">No results yet. Import a question bank and take your first practice exam.</p>:<div className="records">{attempts.slice(0,5).map(a=><button className="record" key={a.id} onClick={()=>{setViewResult(a);setPage('exam');}}><div><strong>{a.certification} — {a.bankTitle}</strong><small>{formatDate(a.completedAt)} · {a.total} questions</small></div><strong>{pct(a.correctCount,a.total)}%</strong></button>)}</div>}</section>
       </div>}
+      {page==='catalog'&&<CatalogPanel banks={banks}/>}
       {page==='banks'&&<div className="stack">
         <section className="panel"><div className="sectionhead"><div><h3>Import a JSON question bank</h3><p className="muted">Validated locally. Files never leave your browser.</p></div><Upload size={24}/></div><label className="upload"><input type="file" accept=".json,application/json" disabled={busy} onChange={e=>{void importFile(e.target.files?.[0]);e.currentTarget.value='';}}/><Upload size={26}/><strong>{busy?'Importing…':'Choose a JSON file'}</strong><small>Maximum 5 MiB · Schema v1.0 · Up to 10,000 questions</small></label><p className="muted">Try the provided sample at <code>samples/demo-bank.json</code>. The importer rejects invalid answer keys, duplicate IDs and unsupported question types.</p></section>
         <section className="panel"><div className="sectionhead"><h3>Imported banks</h3><span className="tag">{banks.length} banks</span></div>{banks.length===0?<p className="empty">No question banks imported yet.</p>:<div className="bankgrid">{banks.map(b=><div className="bankcard" key={b.bank_id}><span className="pill">{b.certification}</span><h4>{b.title}</h4><p>{b.questions.length} questions · {[...new Set(b.questions.map(q=>q.domain))].length} domains</p><div className="actions"><button className="primary small" onClick={()=>{setSelectedBank(b.bank_id);setDomain('ALL');setViewResult(null);setPage('exam');}}>Practise</button><button className="subtle small" disabled={busy} onClick={()=>void exportBankEncrypted(b)}><Download size={15}/> Export encrypted</button><button className="danger small" aria-label={'Delete '+b.title} onClick={()=>void deleteBank(b.bank_id)}><Trash2 size={15}/></button></div></div>)}</div>}</section>
