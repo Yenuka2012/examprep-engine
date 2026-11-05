@@ -65,3 +65,29 @@ test('M1.1 encrypted full backup includes catalog and restores into a fresh prof
     await expect(recovered.getByText('Synthetic 2026 syllabus')).toBeVisible();
   }finally{await context.close();}
 });
+
+test('M1.1 rejects stale draft revisions across two browser tabs',async({page,context})=>{
+  await page.goto('/examprep-engine/');
+  await createCatalog(page);
+  await page.getByRole('button',{name:'Edit draft'}).click();
+  await page.getByLabel('Syllabus title').fill('Outdated change');
+
+  const second=await context.newPage();
+  try{
+    await second.goto('/examprep-engine/');
+    await second.getByRole('button',{name:'Certifications'}).click();
+    await second.getByLabel('Catalog certification').selectOption('DEMO');
+    await second.getByRole('button',{name:'Edit draft'}).click();
+    await second.getByLabel('Syllabus title').fill('Current approved draft');
+    await second.getByRole('button',{name:'Save draft changes'}).click();
+    await expect(second.getByText(/Syllabus draft saved/)).toBeVisible();
+
+    await page.getByRole('button',{name:'Save draft changes'}).click();
+    await expect(page.getByRole('alert').getByText(/Draft was modified in another tab/)).toBeVisible();
+    await page.reload();
+    await page.getByRole('button',{name:'Certifications'}).click();
+    await page.getByLabel('Catalog certification').selectOption('DEMO');
+    await expect(page.getByText('Current approved draft')).toBeVisible();
+    await expect(page.getByText('Outdated change')).toHaveCount(0);
+  }finally{await second.close();}
+});
