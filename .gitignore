@@ -8,3 +8,5 @@ coverage/
 private-question-banks/
 *.backup.json
 \ntest-results/\nplaywright-report/\n
+# Generated build-time CSP-safe schema validators
+src/generated/
