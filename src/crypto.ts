@@ -1,4 +1,5 @@
 // Portable AES-256-GCM encrypted backups. Never persist passwords or derived keys.
+import {MAX_BACKUP_FILE_BYTES} from './backupSize';
 const encoder=new TextEncoder();
 const decoder=new TextDecoder('utf-8',{fatal:true});
 const ITERATIONS=600000;
@@ -32,6 +33,11 @@ export async function encryptBackup(data:unknown,password:string):Promise<Encryp
   const iv=crypto.getRandomValues(new Uint8Array(12));
   const key=await derive(password,salt);
   const plain=encoder.encode(JSON.stringify(data));
+  // Base64 inflates ciphertext by 4/3; reserve envelope overhead and reject
+  // exports that the bounded restore UI could not possibly accept.
+  if(plain.byteLength>Math.floor((MAX_BACKUP_FILE_BYTES-4096)*3/4)){
+    throw new Error('Encrypted backup would exceed the 64 MiB restore limit. Existing browser records were not changed.');
+  }
   const encrypted=await crypto.subtle.encrypt({name:'AES-GCM',iv:new Uint8Array(iv)},key,plain);
   return {format:'examprep-encrypted-backup-v1',cipher:'AES-256-GCM',kdf:'PBKDF2-SHA256',iterations:ITERATIONS,salt:toBase64(salt),iv:toBase64(iv),ciphertext:toBase64(new Uint8Array(encrypted))};
 }
