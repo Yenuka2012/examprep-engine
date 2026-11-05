@@ -16,7 +16,7 @@ async function createCatalog(page:import('@playwright/test').Page){
 }
 test('M1.1 non-destructive migration, draft publication, persisted versions and matching banks',async({page})=>{
   await page.goto('/examprep-engine/');
-  await page.getByRole('button',{name:'Question Banks'}).click();
+  await page.getByRole('button',{name:'Question Banks',exact:true}).click();
   await page.locator('input[type="file"]').first().setInputFiles('samples/demo-bank.json');
   await expect(page.getByText('Cybersecurity Fundamentals Demo').first()).toBeVisible();
   await createCatalog(page);
@@ -31,13 +31,13 @@ test('M1.1 non-destructive migration, draft publication, persisted versions and 
   await page.getByLabel('Catalog certification').selectOption('DEMO');
   await expect(page.getByText('Synthetic 2026 syllabus')).toBeVisible();
   await expect(page.getByText(/1 matching local banks/)).toBeVisible();
-  await page.getByRole('button',{name:'Question Banks'}).click();
+  await page.getByRole('button',{name:'Question Banks',exact:true}).click();
   await expect(page.getByText('Cybersecurity Fundamentals Demo').first()).toBeVisible();
 });
 test('M1.1 encrypted full backup includes catalog and restores into a fresh profile',async({page,browser})=>{
   await page.goto('/examprep-engine/');
   await createCatalog(page);
-  await page.getByRole('button',{name:'Question Banks'}).click();
+  await page.getByRole('button',{name:'Question Banks',exact:true}).click();
   await page.getByPlaceholder('Enter a strong unique passphrase').fill('m1-full-backup-secret-long-passphrase');
   const downloading=page.waitForEvent('download');
   await page.getByRole('button',{name:'Export encrypted backup'}).first().click();
@@ -53,7 +53,7 @@ test('M1.1 encrypted full backup includes catalog and restores into a fresh prof
   try{
     const recovered=await context.newPage();
     await recovered.goto('/examprep-engine/');
-    await recovered.getByRole('button',{name:'Question Banks'}).click();
+    await recovered.getByRole('button',{name:'Question Banks',exact:true}).click();
     await recovered.getByPlaceholder('Enter a strong unique passphrase').fill('m1-full-backup-secret-long-passphrase');
     recovered.on('dialog',dialog=>dialog.accept());
     await recovered.getByLabel('Restore encrypted or legacy backup').setInputFiles({
