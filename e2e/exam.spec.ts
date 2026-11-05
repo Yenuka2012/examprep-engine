@@ -18,9 +18,7 @@ test('exam recovers progress and deadline after hard reload',async({page})=>{
   await expect(page.getByText(/Question 2 of/)).toBeVisible();
   await page.reload();
   await expect(page.getByText(/Question 2 of/)).toBeVisible();
-  await page.getByRole('button',{name:'Previous ←'}).click().catch(async()=>{
-    await page.getByRole('button',{name:/Previous/}).click();
-  });
+  await page.getByRole('button',{name:/Previous/}).click();
   await expect(page.getByRole('button',{name:'Unflag'})).toBeVisible();
 });
 
@@ -34,6 +32,7 @@ test('only one tab can write an active examination and a second tab can take ove
   await page.close();
   await second.getByRole('button',{name:'Resume here'}).click();
   await expect(second.getByText(/Question 1 of/)).toBeVisible();
-  await second.getByRole('button',{name:'Submit exam'}).click();
   second.once('dialog',dialog=>dialog.accept());
+  await second.getByRole('button',{name:'Submit exam'}).click();
+  await expect(second.getByText('EXAM COMPLETE')).toBeVisible();
 });
