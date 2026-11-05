@@ -13,7 +13,11 @@
     "test": "vitest run src",
     "typecheck": "tsc --noEmit",
     "audit": "npm audit --audit-level=high",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "generate:validator": "node scripts/generate-validator.mjs",
+    "prebuild": "npm run generate:validator",
+    "pretest": "npm run generate:validator",
+    "pretypecheck": "npm run generate:validator"
   },
   "dependencies": {
     "ajv": "8.20.0",
