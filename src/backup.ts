@@ -2,10 +2,14 @@ import {isCorrect,validateBank} from './logic';
 import {validateCertification,validateSyllabus} from './catalog';
 import type {Attempt,QuestionBank,CertificationProfile,SyllabusVersion} from './types';
 
-export type ExamBackup={backup_version:1;exported_at:string;banks:QuestionBank[];attempts:Attempt[];
-  /** M1.1 additive optional fields; pre-M1 backups remain valid. */
-  certifications?:CertificationProfile[];syllabi?:SyllabusVersion[];
-};
+type BackupCore={exported_at:string;banks:QuestionBank[];attempts:Attempt[]};
+/** v1 is the historical payload. NEVER attach new fields to it: older apps
+ * silently discard unknown properties during restore. */
+export type LegacyExamBackup=BackupCore&{backup_version:1;certifications?:never;syllabi?:never};
+/** v2 is explicitly incompatible with older readers, preventing loss of
+ * certification catalog data after a partial rollback. */
+export type CatalogExamBackup=BackupCore&{backup_version:2;certifications:CertificationProfile[];syllabi:SyllabusVersion[]};
+export type ExamBackup=LegacyExamBackup|CatalogExamBackup;
 const safeId=/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const iso=(s:unknown):s is string=>typeof s==='string'&&s.length<=40&&/^\d{4}-\d{2}-\d{2}T/.test(s)&&Number.isFinite(Date.parse(s));
 const safe=(s:unknown,max:number)=>typeof s==='string'&&s.length>0&&s.length<=max;
@@ -13,7 +17,22 @@ const safe=(s:unknown,max:number)=>typeof s==='string'&&s.length>0&&s.length<=ma
 export function validateBackupData(input:unknown):ExamBackup{
   if(!input||typeof input!=='object'||Array.isArray(input))throw new Error('Backup root must be an object');
   const data=input as Record<string,unknown>;
-  if(data.backup_version!==1)throw new Error('Unsupported backup version');
+  if(data.backup_version!==1&&data.backup_version!==2)throw new Error('Unsupported backup version');
+  const isCatalog=data.backup_version===2;
+  // Fail closed for forward fields. In particular, NEVER allow catalog data
+  // to masquerade as version 1, since v0.2.1 would silently drop it.
+  if(!isCatalog && ('certifications' in data || 'syllabi' in data)){
+    throw new Error('Catalog fields require backup version 2 to prevent data loss');
+  }
+  if(isCatalog){
+    if(!Array.isArray(data.certifications)||!Array.isArray(data.syllabi)){
+      throw new Error('Version 2 backup requires certifications and syllabi arrays');
+    }
+    const fields=new Set(['backup_version','exported_at','banks','attempts','certifications','syllabi']);
+    if(Object.keys(data).some(key=>!fields.has(key))){
+      throw new Error('Unknown version 2 backup fields: unsupported future schema');
+    }
+  }
   if(!Array.isArray(data.banks)||data.banks.length>300)throw new Error('Invalid number of question banks');
   if(!Array.isArray(data.attempts)||data.attempts.length>10000)throw new Error('Invalid number of exam attempts');
   if(!iso(data.exported_at))throw new Error('Invalid backup export timestamp');
@@ -64,10 +83,11 @@ export function validateBackupData(input:unknown):ExamBackup{
     if(computed!==v.correctCount)err('score does not match frozen answer key');
     attempts.push(v as unknown as Attempt);
   }
-  // Optional catalog fields preserve compatibility with v0.1/v0.2 backup files.
+  // The new v2 catalog fields are required. Old logical v1 payloads
+  // remain valid and contain no catalog entries.
   const certifications:CertificationProfile[]=[];
   const syllabi:SyllabusVersion[]=[];
-  if(data.certifications!==undefined){
+  if(isCatalog){
     if(!Array.isArray(data.certifications)||data.certifications.length>200)throw new Error('Invalid catalog certification count');
     const ids=new Set<string>();
     for(const raw of data.certifications){
@@ -76,7 +96,7 @@ export function validateBackupData(input:unknown):ExamBackup{
       ids.add(entry.id);certifications.push(entry);
     }
   }
-  if(data.syllabi!==undefined){
+  if(isCatalog){
     if(!Array.isArray(data.syllabi)||data.syllabi.length>500)throw new Error('Invalid catalog syllabus count');
     const ids=new Set<string>();
     const certIds=new Set(certifications.map(c=>c.id));
@@ -87,8 +107,8 @@ export function validateBackupData(input:unknown):ExamBackup{
       ids.add(entry.id);syllabi.push(entry);
     }
   }
-  return {backup_version:1,exported_at:data.exported_at as string,banks,attempts,
-    ...(data.certifications!==undefined?{certifications}:{}),
-    ...(data.syllabi!==undefined?{syllabi}:{})};
-
+  const core={exported_at:data.exported_at as string,banks,attempts};
+  return isCatalog
+    ? {backup_version:2,...core,certifications,syllabi}
+    : {backup_version:1,...core};
 }
