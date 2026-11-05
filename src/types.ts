@@ -14,3 +14,9 @@ export type Attempt = {
   answers: Record<string,string[]>; questionSnapshots: Question[];
   correctCount: number; total: number;
 };
+export type ExamSession = {
+  id: string; bank: QuestionBank; questions: Question[];
+  answers: Record<string,string[]>; marked: string[]; index: number;
+  startedAt: string; endsAt: number; durationSeconds: number;
+};
+export type StoredSession = {key: 'current'; value: ExamSession};

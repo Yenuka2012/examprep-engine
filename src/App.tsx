@@ -1,14 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { BookOpen, Upload, BarChart3, ShieldCheck, Download, Trash2, ArrowLeft, CheckCircle2, Clock3, Flag, Shuffle, Play } from 'lucide-react';
 import { db } from './db';
 import { isCorrect, shuffle, validateBank } from './logic';
-import type { Attempt, Question, QuestionBank } from './types';
+import { encryptBackup, decryptBackup, isEncryptedBackup, type EncryptedBackup } from './crypto';
+import { validateBackupData } from './backup';
+import type { Attempt, ExamSession, QuestionBank } from './types';
 
 type Page = 'dashboard' | 'banks' | 'exam' | 'analytics';
-type Session = {
-  id: string; bank: QuestionBank; questions: Question[]; answers: Record<string,string[]>;
-  marked: string[]; index: number; startedAt: string; endsAt: number; durationSeconds: number;
-};
 const SESSION_KEY = 'examprep-active-session-v1';
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 function fmtTime(seconds:number) { const s=Math.max(0,Math.floor(seconds)); return Math.floor(s/60).toString().padStart(2,'0')+':'+(s%60).toString().padStart(2,'0'); }
@@ -19,9 +17,10 @@ export default function App() {
   const [page,setPage]=useState<Page>('dashboard');
   const [banks,setBanks]=useState<QuestionBank[]>([]);
   const [attempts,setAttempts]=useState<Attempt[]>([]);
-  const [session,setSession]=useState<Session|null>(()=>{
-    try { const raw=sessionStorage.getItem(SESSION_KEY); return raw?JSON.parse(raw) as Session:null; }catch {return null;}
-  });
+  const [session,setSession]=useState<ExamSession|null>(null);
+  const [sessionLoaded,setSessionLoaded]=useState(false);
+  const sessionWrites=useRef<Promise<void>>(Promise.resolve());
+  const completing=useRef(false);
   const [viewResult,setViewResult]=useState<Attempt|null>(null);
   const [selectedBank,setSelectedBank]=useState('');
   const [examSize,setExamSize]=useState(20);
@@ -30,11 +29,38 @@ export default function App() {
   const [error,setError]=useState('');
   const [notice,setNotice]=useState('');
   const [busy,setBusy]=useState(false);
+  const [backupPassphrase,setBackupPassphrase]=useState('');
   const [now,setNow]=useState(Date.now());
 
   async function reload(){setBanks(await db.banks.toArray());setAttempts((await db.attempts.toArray()).sort((a,b)=>b.completedAt.localeCompare(a.completedAt)));}
-  useEffect(()=>{void reload();},[]);
-  useEffect(()=>{if(session)sessionStorage.setItem(SESSION_KEY,JSON.stringify(session));else sessionStorage.removeItem(SESSION_KEY);},[session]);
+  useEffect(()=>{void reload().catch(()=>setError('Local database cannot be opened. Check browser storage settings.'));},[]);
+  useEffect(()=>{
+    let mounted=true;
+    void db.activeSessions.get('current').then(saved=>{
+      if(!mounted)return;
+      if(saved?.value){setSession(saved.value);return;}
+      // One-time migration from v0.1 tab-only session storage.
+      try{
+        const previous=sessionStorage.getItem(SESSION_KEY);
+        if(previous){
+          const candidate:unknown=JSON.parse(previous);
+          if(candidate&&typeof candidate==='object'&&'id' in candidate&&'bank' in candidate&&'questions' in candidate&&'endsAt' in candidate){
+            const value=candidate as ExamSession;
+            if(typeof value.id==='string'&&typeof value.endsAt==='number'&&Array.isArray(value.questions)&&validateBank(value.bank).errors.length===0)setSession(value);
+          }
+        }
+      }catch{/* Discard invalid legacy session data. */}
+    }).catch(()=>{if(mounted)setError('Unable to restore an unfinished exam from IndexedDB.');}).finally(()=>{if(mounted){setSessionLoaded(true);sessionStorage.removeItem(SESSION_KEY);}});
+    return ()=>{mounted=false;};
+  },[]);
+  useEffect(()=>{
+    if(!sessionLoaded)return;
+    const current=session;
+    sessionWrites.current=sessionWrites.current.then(async()=>{
+      if(current)await db.activeSessions.put({key:'current',value:current});
+      else await db.activeSessions.delete('current');
+    }).catch(()=>setError('Failed to autosave the exam session. Check browser storage.'));
+  },[session,sessionLoaded]);
   useEffect(()=>{if(!session)return;const t=window.setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(t);},[session]);
 
   const bank=banks.find(b=>b.bank_id===selectedBank)??banks[0];
@@ -42,15 +68,23 @@ export default function App() {
   const eligible=useMemo(()=>bank?.questions.filter(q=>domain==='ALL'||q.domain===domain)??[],[bank,domain]);
   const timeLeft=session ? Math.max(0,Math.ceil((session.endsAt-now)/1000)) : 0;
 
-  function completeExam(active:Session){
+  function completeExam(active:ExamSession){
+    if(completing.current)return;
+    completing.current=true;
     const correctCount=active.questions.filter(q=>isCorrect(q,active.answers[q.id]??[])).length;
     const record:Attempt={
       id:active.id, bankId:active.bank.bank_id,bankTitle:active.bank.title,certification:active.bank.certification,
       startedAt:active.startedAt,completedAt:new Date().toISOString(),durationSeconds:active.durationSeconds,
       answers:active.answers,questionSnapshots:active.questions,correctCount,total:active.questions.length
     };
-    setSession(null);setViewResult(record);setPage('exam');
-    void db.attempts.put(record).then(reload).catch(()=>setError('Results could not be saved. Export your data before closing this page.'));
+    // Persist the result and clear the active session in a single database transaction.
+    void sessionWrites.current.then(()=>db.transaction('rw',db.attempts,db.activeSessions,async()=>{
+      await db.attempts.put(record);
+      await db.activeSessions.delete('current');
+    })).then(async()=>{
+      setSession(null);setViewResult(record);setPage('exam');await reload();
+    }).catch(()=>setError('Exam submission could not be saved. Your unfinished exam is retained; retry after resolving storage access.'))
+      .finally(()=>{completing.current=false;});
   }
   useEffect(()=>{
     if(session && timeLeft<=0) completeExam(session);
@@ -104,27 +138,34 @@ export default function App() {
     const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
     const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;a.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);
   }
-  async function backup(){saveJson({backup_version:1,exported_at:new Date().toISOString(),banks:await db.banks.toArray(),attempts:await db.attempts.toArray()},'examprep-backup-'+new Date().toISOString().slice(0,10)+'.json');}
+  async function backup(){
+    setError('');
+    try{
+      const data={backup_version:1,exported_at:new Date().toISOString(),banks:await db.banks.toArray(),attempts:await db.attempts.toArray()};
+      const encrypted=await encryptBackup(data,backupPassphrase);
+      saveJson(encrypted,'examprep-ENCRYPTED-'+new Date().toISOString().slice(0,10)+'.json');
+      setNotice('Encrypted backup exported. Keep the passphrase safe; it cannot be recovered.');
+    }catch(e){setError(e instanceof Error?e.message:'Backup encryption failed');}
+    finally{setBackupPassphrase('');}
+  }
   async function restore(file:File|undefined){
     if(!file)return;setError('');
     if(file.size>MAX_FILE_BYTES*4){setError('Backup exceeds 20 MiB');return;}
     try{
       const raw:unknown=JSON.parse(await file.text());
-      if(!raw||typeof raw!=='object'||Array.isArray(raw)){throw new Error('Invalid backup');}
-      const data=raw as Record<string,unknown>;
-      if(data.backup_version!==1||!Array.isArray(data.banks)||!Array.isArray(data.attempts))throw new Error('Unsupported backup version');
-      if(data.banks.length>300||data.attempts.length>50000)throw new Error('Backup exceeds safety limits');
-      const validated=data.banks.map(validateBank);
-      if(validated.some(v=>v.errors.length))throw new Error('Backup contains invalid question banks');
-      const validAttempts=data.attempts.every(v=>v&&typeof v==='object'&&typeof v.id==='string'&&typeof v.bankId==='string'&&Array.isArray(v.questionSnapshots)&&typeof v.completedAt==='string');
-      if(!validAttempts)throw new Error('Backup contains invalid attempt records');
+      if(!isEncryptedBackup(raw))throw new Error('Only encrypted v1 backups can be restored. Unencrypted legacy backups must be migrated separately.');
+      if(!backupPassphrase)throw new Error('Enter the backup passphrase before restoring');
+      const decrypted=await decryptBackup(raw as EncryptedBackup,backupPassphrase);
+      if(!decrypted||typeof decrypted!=='object'||Array.isArray(decrypted)){throw new Error('Invalid decrypted backup');}
+      const validated=validateBackupData(decrypted);
       if(!window.confirm('Restore backup into this browser? Existing records with matching IDs will be replaced.'))return;
       await db.transaction('rw',db.banks,db.attempts,async()=>{
-        await db.banks.bulkPut(validated.map(v=>v.bank!));
-        await db.attempts.bulkPut(data.attempts as Attempt[]);
+        await db.banks.bulkPut(validated.banks);
+        await db.attempts.bulkPut(validated.attempts);
       });
       await reload();setNotice('Backup restored successfully');
     }catch(e){setError(e instanceof Error?e.message:'Restore failed');}
+    finally{setBackupPassphrase('');}
   }
   const totalQuestions=banks.reduce((sum,b)=>sum+b.questions.length,0);
   const totalCorrect=attempts.reduce((sum,a)=>sum+a.correctCount,0);
@@ -145,7 +186,7 @@ export default function App() {
           <button key={id} onClick={()=>{setPage(id);setError('');}} className={'navbtn '+(page===id?'active':'')}><Icon size={18}/>{label}</button>
         )}
       </div>
-      <div className="sidefoot"><ShieldCheck size={16}/> Local-first · v0.1.0<br/><small>No cloud sync. Backup regularly.</small></div>
+      <div className="sidefoot"><ShieldCheck size={16}/> Local-first · v0.2.0<br/><small>No cloud sync. Backup regularly.</small></div>
     </aside>
     <main className="main">
       <header className="top"><div><p className="eyebrow">EXAM PREPARATION WORKSPACE</p><h1>{page==='banks'?'Question Banks':page==='exam'?'Exam Simulator':page==='analytics'?'Learning Analytics':'Overview'}</h1></div><span className="tag">Browser-local storage</span></header>
@@ -160,7 +201,7 @@ export default function App() {
       {page==='banks'&&<div className="stack">
         <section className="panel"><div className="sectionhead"><div><h3>Import a JSON question bank</h3><p className="muted">Validated locally. Files never leave your browser.</p></div><Upload size={24}/></div><label className="upload"><input type="file" accept=".json,application/json" disabled={busy} onChange={e=>{void importFile(e.target.files?.[0]);e.currentTarget.value='';}}/><Upload size={26}/><strong>{busy?'Importing…':'Choose a JSON file'}</strong><small>Maximum 5 MiB · Schema v1.0 · Up to 10,000 questions</small></label><p className="muted">Try the provided sample at <code>samples/demo-bank.json</code>. The importer rejects invalid answer keys, duplicate IDs and unsupported question types.</p></section>
         <section className="panel"><div className="sectionhead"><h3>Imported banks</h3><span className="tag">{banks.length} banks</span></div>{banks.length===0?<p className="empty">No question banks imported yet.</p>:<div className="bankgrid">{banks.map(b=><div className="bankcard" key={b.bank_id}><span className="pill">{b.certification}</span><h4>{b.title}</h4><p>{b.questions.length} questions · {[...new Set(b.questions.map(q=>q.domain))].length} domains</p><div className="actions"><button className="primary small" onClick={()=>{setSelectedBank(b.bank_id);setDomain('ALL');setViewResult(null);setPage('exam');}}>Practise</button><button className="subtle small" onClick={()=>saveJson(b,b.bank_id+'.json')}><Download size={15}/> Export</button><button className="danger small" aria-label={'Delete '+b.title} onClick={()=>void deleteBank(b.bank_id)}><Trash2 size={15}/></button></div></div>)}</div>}</section>
-        <section className="panel"><div className="sectionhead"><h3>Data portability</h3><ShieldCheck size={20}/></div><p className="muted">Back up question banks and exam history before clearing browser data or switching devices. Backups in this release are NOT encrypted.</p><div className="actions"><button className="secondary" onClick={()=>void backup()}><Download size={16}/> Export complete backup</button><label className="buttonlike">Restore backup<input hidden type="file" accept=".json,application/json" onChange={e=>{void restore(e.target.files?.[0]);e.currentTarget.value='';}}/></label></div></section>
+        <section className="panel"><div className="sectionhead"><h3>Data portability</h3><ShieldCheck size={20}/></div><p className="muted">Encrypt full backups with AES-256-GCM. Your passphrase is never stored. Losing it means losing access to the backup. Browser IndexedDB remains unencrypted.</p><label className="backup-passphrase">Backup passphrase (at least 12 characters)<input autoComplete="new-password" type="password" value={backupPassphrase} onChange={e=>setBackupPassphrase(e.target.value)} placeholder="Enter a strong unique passphrase" /></label><div className="actions"><button className="secondary" disabled={backupPassphrase.length<12} onClick={()=>void backup()}><Download size={16}/> Export encrypted backup</button><label className="buttonlike">Restore backup<input hidden type="file" accept=".json,application/json" onChange={e=>{void restore(e.target.files?.[0]);e.currentTarget.value='';}}/></label></div></section>
       </div>}
       {page==='exam'&&!session&&viewResult&&<div className="stack">
         <button className="subtle back" onClick={()=>setViewResult(null)}><ArrowLeft size={16}/> Back to exam setup</button>
@@ -180,17 +221,17 @@ export default function App() {
       </section></div>}
       {page==='exam'&&session&&(()=>{const q=session.questions[session.index];const picked=session.answers[q.id]??[];return <div className="stack">
         <section className="examtoolbar"><div><span className="eyebrow">{session.bank.certification} · {q.domain}</span><strong>Question {session.index+1} of {session.questions.length}</strong></div><div className={'timer '+(timeLeft<60?'urgent':'')}><Clock3 size={18}/> {fmtTime(timeLeft)}</div></section>
-        <div className="progress"><div style={{width:(session.index+1)/session.questions.length*100+'%'}}/></div>
+        <div className="progress"><progress aria-label="Exam progress" value={session.index+1} max={session.questions.length}/></div>
         <section className="panel questionpanel"><div className="sectionhead"><span className="pill">{q.type==='multiple_choice'?'Select all that apply':'Select one answer'}</span><button className="subtle" onClick={flag}><Flag size={16}/> {session.marked.includes(q.id)?'Unflag':'Flag'}</button></div><h2>{q.question}</h2><div className="choices">{q.options.map(o=><label className={'choice '+(picked.includes(o.id)?'selected':'')} key={o.id}><input type={q.type==='multiple_choice'?'checkbox':'radio'} name={'choice-'+q.id} checked={picked.includes(o.id)} onChange={()=>answer(q.id,o.id,q.type==='multiple_choice')}/><span className="letter">{o.id}</span><span>{o.text}</span></label>)}</div></section>
         <section className="panel"><div className="sectionhead"><h3>Question navigator</h3><span className="muted">{Object.keys(session.answers).filter(k=>(session.answers[k]??[]).length).length} answered</span></div><div className="numbergrid">{session.questions.map((item,i)=><button key={item.id} title={'Question '+(i+1)} className={'num '+(i===session.index?'current ':'')+((session.answers[item.id]??[]).length?'answered ':'')+(session.marked.includes(item.id)?'flagged':'')} onClick={()=>move(i)}>{i+1}</button>)}</div><div className="actions spread"><button className="secondary" disabled={session.index===0} onClick={()=>move(session.index-1)}>← Previous</button><button className="secondary" disabled={session.index===session.questions.length-1} onClick={()=>move(session.index+1)}>Next →</button></div><div className="examend"><button className="danger" onClick={()=>{if(window.confirm('Submit exam now? Unanswered questions will be marked incorrect.'))completeExam(session);}}>Submit exam</button></div></section>
       </div>;})()}
       {page==='analytics'&&<div className="stack">
         <section className="stats"><div className="stat"><span>Completed exams</span><strong>{attempts.length}</strong></div><div className="stat"><span>Questions answered</span><strong>{totalAttempted}</strong></div><div className="stat"><span>Total correct</span><strong>{totalCorrect}</strong></div><div className="stat"><span>Overall accuracy</span><strong>{pct(totalCorrect,totalAttempted)}%</strong></div></section>
-        <section className="panel"><h3>Domain performance</h3>{domainStats.length===0?<p className="empty">Take an exam to view your performance by domain.</p>:<div className="domains">{domainStats.map(d=><div key={d.name} className="domainrow"><div className="sectionhead"><strong>{d.name}</strong><span>{d.correct}/{d.total} · {pct(d.correct,d.total)}%</span></div><div className="meter"><div style={{width:pct(d.correct,d.total)+'%'}}/></div></div>)}</div>}</section>
+        <section className="panel"><h3>Domain performance</h3>{domainStats.length===0?<p className="empty">Take an exam to view your performance by domain.</p>:<div className="domains">{domainStats.map(d=><div key={d.name} className="domainrow"><div className="sectionhead"><strong>{d.name}</strong><span>{d.correct}/{d.total} · {pct(d.correct,d.total)}%</span></div><div className="meter"><progress aria-label={d.name+' accuracy'} value={d.correct} max={d.total}/></div></div>)}</div>}</section>
         <section className="panel"><h3>Exam history</h3>{attempts.length===0?<p className="empty">No completed attempts yet.</p>:<div className="records">{attempts.map(a=><button className="record" key={a.id} onClick={()=>{setViewResult(a);setPage('exam');}}><div><strong>{a.certification} — {a.bankTitle}</strong><small>{formatDate(a.completedAt)} · {a.total} questions</small></div><strong>{pct(a.correctCount,a.total)}%</strong></button>)}</div>}</section>
-        <section className="panel"><h3>Backup and recovery</h3><p className="muted">Export exam history and all banks as JSON. This file is unencrypted; protect it yourself.</p><button className="secondary" onClick={()=>void backup()}><Download size={16}/> Export backup</button></section>
+        <section className="panel"><h3>Backup and recovery</h3><p className="muted">Export exam history and banks encrypted with a strong passphrase using AES-256-GCM.</p><label className="backup-passphrase">Backup passphrase<input autoComplete="new-password" type="password" value={backupPassphrase} onChange={e=>setBackupPassphrase(e.target.value)} placeholder="At least 12 characters" /></label><button className="secondary" disabled={backupPassphrase.length<12} onClick={()=>void backup()}><Download size={16}/> Export encrypted backup</button></section>
       </div>}
-      <footer>ExamPrep Engine v0.1.0 · Your data stays in this browser · Not affiliated with certification providers</footer>
+      <footer>ExamPrep Engine v0.2.0 · Your data stays in this browser · Not affiliated with certification providers</footer>
     </main>
   </div>;
 }
