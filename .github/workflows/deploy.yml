@@ -1,4 +1,4 @@
-name: Validate and deploy ExamPrep
+name: Secure CI and GitHub Pages deployment
 on:
   push:
     branches: [main]
@@ -11,29 +11,39 @@ concurrency:
   group: examprep-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  test-and-build:
+  verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7.0.1
         with:
-          node-version: '22'
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
-      - name: Type check
+          persist-credentials: false
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Reproducible dependency installation
+        run: npm ci --no-fund
+      - name: Dependency vulnerability gate
+        run: npm audit --audit-level=high
+      - name: Strict TypeScript validation
         run: npm run typecheck
-      - name: Unit tests
+      - name: Unit and security tests
         run: npm test
-      - name: Build
+      - name: Production build
         run: npm run build
-      - uses: actions/upload-artifact@v4
+      - name: Publish validated site build
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: site-dist
           path: dist/
+          if-no-files-found: error
+          retention-days: 7
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    needs: test-and-build
+    needs: verify
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -41,7 +51,7 @@ jobs:
       pages: write
       id-token: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8.0.2
         with:
           name: site-dist
           path: dist
@@ -49,4 +59,4 @@ jobs:
         with:
           path: dist
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5.0.1
