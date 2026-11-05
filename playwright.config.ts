@@ -2,11 +2,11 @@ import {defineConfig,devices} from '@playwright/test';
 
 export default defineConfig({
   testDir:'./e2e',
-  timeout:45_000,
+  timeout:20_000,
   expect:{timeout:12_000},
   fullyParallel:false,
   forbidOnly:!!process.env.CI,
-  retries:process.env.CI?1:0,
+  retries:0,
   reporter:process.env.CI?'github':'list',
   use:{baseURL:'http://127.0.0.1:4173',trace:'retain-on-failure'},
   projects:[
