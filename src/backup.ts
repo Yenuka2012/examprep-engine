@@ -1,7 +1,11 @@
 import {isCorrect,validateBank} from './logic';
-import type {Attempt,QuestionBank} from './types';
+import {validateCertification,validateSyllabus} from './catalog';
+import type {Attempt,QuestionBank,CertificationProfile,SyllabusVersion} from './types';
 
-export type ExamBackup={backup_version:1;exported_at:string;banks:QuestionBank[];attempts:Attempt[]};
+export type ExamBackup={backup_version:1;exported_at:string;banks:QuestionBank[];attempts:Attempt[];
+  /** M1.1 additive optional fields; pre-M1 backups remain valid. */
+  certifications?:CertificationProfile[];syllabi?:SyllabusVersion[];
+};
 const safeId=/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const iso=(s:unknown):s is string=>typeof s==='string'&&s.length<=40&&/^\d{4}-\d{2}-\d{2}T/.test(s)&&Number.isFinite(Date.parse(s));
 const safe=(s:unknown,max:number)=>typeof s==='string'&&s.length>0&&s.length<=max;
@@ -60,5 +64,31 @@ export function validateBackupData(input:unknown):ExamBackup{
     if(computed!==v.correctCount)err('score does not match frozen answer key');
     attempts.push(v as unknown as Attempt);
   }
-  return {backup_version:1,exported_at:data.exported_at as string,banks,attempts};
+  // Optional catalog fields preserve compatibility with v0.1/v0.2 backup files.
+  const certifications:CertificationProfile[]=[];
+  const syllabi:SyllabusVersion[]=[];
+  if(data.certifications!==undefined){
+    if(!Array.isArray(data.certifications)||data.certifications.length>200)throw new Error('Invalid catalog certification count');
+    const ids=new Set<string>();
+    for(const raw of data.certifications){
+      const entry=validateCertification(raw);
+      if(ids.has(entry.id))throw new Error('Duplicate certification IDs in backup');
+      ids.add(entry.id);certifications.push(entry);
+    }
+  }
+  if(data.syllabi!==undefined){
+    if(!Array.isArray(data.syllabi)||data.syllabi.length>500)throw new Error('Invalid catalog syllabus count');
+    const ids=new Set<string>();
+    const certIds=new Set(certifications.map(c=>c.id));
+    for(const raw of data.syllabi){
+      const entry=validateSyllabus(raw);
+      if(ids.has(entry.id))throw new Error('Duplicate syllabus IDs in backup');
+      if(!certIds.has(entry.certificationId))throw new Error('Syllabus backup must include its parent certification');
+      ids.add(entry.id);syllabi.push(entry);
+    }
+  }
+  return {backup_version:1,exported_at:data.exported_at as string,banks,attempts,
+    ...(data.certifications!==undefined?{certifications}:{}),
+    ...(data.syllabi!==undefined?{syllabi}:{})};
+
 }
