@@ -1,4 +1,5 @@
 import {db} from './db';
+import {jsonEqual} from './jsonEqual';
 import {ExamLock} from './examLock';
 import {decryptBackup,isEncryptedBackup} from './crypto';
 import {validateBackupData,type ExamBackup} from './backup';
@@ -49,13 +50,13 @@ export async function restoreBackup(data:ExamBackup):Promise<Omit<RestoreResult,
       for(const bank of validated.banks){
         const present=await db.banks.get(bank.bank_id);
         if(present){
-          if(JSON.stringify(present)!==JSON.stringify(bank))throw new Error('Question bank ID conflict: '+bank.bank_id+'. No data restored.');
+          if(!jsonEqual(present,bank))throw new Error('Question bank ID conflict: '+bank.bank_id+'. No data restored.');
         }else newBanks.push(bank);
       }
       for(const attempt of validated.attempts){
         const present=await db.attempts.get(attempt.id);
         if(present){
-          if(JSON.stringify(present)!==JSON.stringify(attempt))throw new Error('Attempt ID conflict: '+attempt.id+'. No data restored.');
+          if(!jsonEqual(present,attempt))throw new Error('Attempt ID conflict: '+attempt.id+'. No data restored.');
         }else newAttempts.push(attempt);
       }
       if(newBanks.length)await db.banks.bulkAdd(newBanks);
