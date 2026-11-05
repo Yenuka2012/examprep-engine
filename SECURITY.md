@@ -1,16 +1,26 @@
 # Security policy
 
-ExamPrep Engine v0.1.0 is a **personal local-first prototype**, not an authentication service or proctored exam platform.
+ExamPrep Engine v0.2.0 is a personal, local-first examination tool.
 
-- GitHub Pages serves public application code. Never commit confidential question banks, credentials, tokens, or real exam content.
-- Uploaded question banks are stored locally in browser IndexedDB; this is **not encrypted at rest**.
-- Anyone with access to your unlocked browser profile may access question banks and answer keys.
-- Only import JSON you have the right to use. Reject files above 5 MiB or containing more than 10,000 questions.
-- Exported JSON backups are **unencrypted** in v0.1.0. Store them securely.
-- Do not use this application to store secrets or regulated personal information.
-- Browser storage can be cleared or evicted; maintain manual backups.
-- Avoid adding third-party trackers or rendering imported strings as HTML.
-- Report vulnerabilities privately to the repository owner. Do not post sensitive exploit details publicly.
+## Supported release
+Only the latest merged and validated release on `main` is supported.
 
-## Planned hardening
-Encrypted export/restore, explicit migrations, offline PWA caching, CSP tuning, import stress tests, CI dependency gates, and optional authenticated backend are future milestones. Do not treat them as already delivered.
+## Data protection
+- The application and source code are public on GitHub Pages.
+- Question banks imported through the app are browser-local and **not encrypted at rest**.
+- Completed exams and unfinished session data are also stored in browser IndexedDB.
+- Backup exports are protected using AES-256-GCM with a passphrase-derived key.
+- Backup files cannot be recovered if the passphrase is forgotten.
+- Do not commit private study content, exam dumps, credentials, API tokens or personal secrets.
+- A malicious extension, compromised endpoint or unlocked browser profile can read local question data.
+- Browser storage can be evicted; export and securely retain encrypted backups.
+
+## Upload security
+- Imported questions must conform to the strict versioned JSON schema.
+- Invalid question types, answer keys, IDs, unexpected fields and oversized inputs are rejected.
+- Imported questions must not be trusted as HTML or executable content.
+
+## Reporting
+Report vulnerabilities privately to the repository owner. Do not disclose sensitive exploit details publicly.
+
+See [docs/SECURITY-REVIEW.md](docs/SECURITY-REVIEW.md) for security controls, trust boundaries and remaining work.
