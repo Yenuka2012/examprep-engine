@@ -1,7 +1,17 @@
 import {test,expect,type Page} from '@playwright/test';
 
 async function importSample(page:Page){
-  await page.goto('/examprep-engine/');
+  page.on('pageerror',error=>console.log('E2E PAGE ERROR:',error.message));
+  page.on('console',message=>{if(message.type()==='error')console.log('E2E CONSOLE ERROR:',message.text());});
+  page.on('response',response=>{if(response.status()>=400)console.log('E2E HTTP:',response.status(),response.url());});
+  const response=await page.goto('/examprep-engine/');
+  console.log('E2E STARTUP:',JSON.stringify({
+    url:page.url(),status:response?.status(),title:await page.title(),
+    body:(await page.locator('body').innerText()).slice(0,500),
+    root:(await page.locator('#root').count()), 
+    scriptCount:await page.locator('script').count()
+  }));
+  await expect(page.getByRole('button',{name:'Question Banks'})).toBeVisible({timeout:8000});
   await page.getByRole('button',{name:'Question Banks'}).click();
   await page.locator('input[type="file"]').first().setInputFiles('samples/demo-bank.json');
   await expect(page.getByText('Cybersecurity Fundamentals Demo').first()).toBeVisible();
