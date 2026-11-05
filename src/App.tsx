@@ -68,14 +68,14 @@ export default function App() {
           setExamAccess(lock.supported?'idle':'unsupported');
           return;
         }
-        if(!lock.supported){setSession(saved);setExamAccess('unsupported');return;}
+        if(!lock.supported){setSession(saved);setPage('exam');setExamAccess('unsupported');return;}
         if(!lock.owned && !await lock.acquire()){
-          if(mounted){setSession(saved);setExamAccess('blocked');}
+          if(mounted){setSession(saved);setPage('exam');setExamAccess('blocked');}
           return;
         }
         const current=await loadActiveExam();
         if(!mounted){await lock.release();return;}
-        if(current){setSession(current);setExamAccess('owner');}
+        if(current){setSession(current);setPage('exam');setExamAccess('owner');}
         else{await lock.release();setSession(null);setExamAccess('idle');}
       }catch{
         if(mounted){setExamAccess('blocked');setError('Unable to recover the active examination safely. No data was changed.');}
