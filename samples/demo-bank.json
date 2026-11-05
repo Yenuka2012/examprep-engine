@@ -1,0 +1,169 @@
+{
+  "schema_version": "1.0",
+  "bank_id": "DEMO-FUNDAMENTALS-001",
+  "title": "Cybersecurity Fundamentals Demo",
+  "certification": "DEMO",
+  "syllabus_version": "2026",
+  "questions": [
+    {
+      "id": "DEMO-Q001",
+      "type": "single_choice",
+      "domain": "Governance",
+      "topic": "Risk",
+      "difficulty": "easy",
+      "question": "What is the main purpose of a risk assessment?",
+      "options": [
+        {
+          "id": "A",
+          "text": "To purchase security products"
+        },
+        {
+          "id": "B",
+          "text": "To identify and evaluate risks"
+        },
+        {
+          "id": "C",
+          "text": "To guarantee there will be no incidents"
+        },
+        {
+          "id": "D",
+          "text": "To replace management decisions"
+        }
+      ],
+      "correct_answers": [
+        "B"
+      ],
+      "explanation": "Risk assessment identifies and evaluates relevant risks so that appropriate treatment decisions can be made.",
+      "tags": [
+        "risk"
+      ]
+    },
+    {
+      "id": "DEMO-Q002",
+      "type": "single_choice",
+      "domain": "Operations",
+      "topic": "Incident Response",
+      "difficulty": "medium",
+      "question": "Which step should follow identification and initial analysis of a suspected security incident?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Delete all logs immediately"
+        },
+        {
+          "id": "B",
+          "text": "Ignore the alert"
+        },
+        {
+          "id": "C",
+          "text": "Follow the incident response process and contain as appropriate"
+        },
+        {
+          "id": "D",
+          "text": "Publish credentials"
+        }
+      ],
+      "correct_answers": [
+        "C"
+      ],
+      "explanation": "Incidents should be managed using the approved response process, with containment proportional to the assessed incident.",
+      "tags": [
+        "incident-response"
+      ]
+    },
+    {
+      "id": "DEMO-Q003",
+      "type": "multiple_choice",
+      "domain": "Engineering",
+      "topic": "Defense in Depth",
+      "difficulty": "easy",
+      "question": "Which TWO are examples of defense-in-depth controls?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Network segmentation"
+        },
+        {
+          "id": "B",
+          "text": "Multifactor authentication"
+        },
+        {
+          "id": "C",
+          "text": "Sharing administrator passwords"
+        },
+        {
+          "id": "D",
+          "text": "Disabling all monitoring"
+        }
+      ],
+      "correct_answers": [
+        "A",
+        "B"
+      ],
+      "explanation": "Network segmentation and MFA reduce different attack paths and provide complementary protections.",
+      "tags": [
+        "security-controls"
+      ]
+    },
+    {
+      "id": "DEMO-Q004",
+      "type": "single_choice",
+      "domain": "Governance",
+      "topic": "Ownership",
+      "difficulty": "medium",
+      "question": "Who should accept residual business risk after security recommendations?",
+      "options": [
+        {
+          "id": "A",
+          "text": "An authorized business risk owner"
+        },
+        {
+          "id": "B",
+          "text": "Any external vendor"
+        },
+        {
+          "id": "C",
+          "text": "The newest employee"
+        },
+        {
+          "id": "D",
+          "text": "The helpdesk by default"
+        }
+      ],
+      "correct_answers": [
+        "A"
+      ],
+      "explanation": "Residual risk acceptance should be made by the accountable, authorized risk owner."
+    },
+    {
+      "id": "DEMO-Q005",
+      "type": "single_choice",
+      "domain": "Engineering",
+      "topic": "Logging",
+      "difficulty": "medium",
+      "question": "Which event indicates a potential collection outage?",
+      "options": [
+        {
+          "id": "A",
+          "text": "A monitoring dashboard displays normal status"
+        },
+        {
+          "id": "B",
+          "text": "A critical source stops sending expected events"
+        },
+        {
+          "id": "C",
+          "text": "A user successfully signs in"
+        },
+        {
+          "id": "D",
+          "text": "A scheduled report is generated"
+        }
+      ],
+      "correct_answers": [
+        "B"
+      ],
+      "explanation": "Unexpected silence from an expected source can indicate collection failure and should be investigated."
+    }
+  ]
+}
