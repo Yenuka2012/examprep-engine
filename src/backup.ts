@@ -35,10 +35,11 @@ export function validateBackupData(input:unknown):ExamBackup{
     if(!iso(v.startedAt)||!iso(v.completedAt))err('invalid timestamps');
     if(typeof v.durationSeconds!=='number'||!Number.isInteger(v.durationSeconds)||v.durationSeconds<1||v.durationSeconds>18000)err('invalid duration');
     if(!Array.isArray(v.questionSnapshots)||v.questionSnapshots.length<1||v.questionSnapshots.length>10000)err('invalid question snapshots');
-    totalQuestions+=v.questionSnapshots.length;
+    const snapshots=v.questionSnapshots as unknown[];
+    totalQuestions+=snapshots.length;
     if(totalQuestions>150000)err('total question snapshot limit exceeded');
-    if(typeof v.total!=='number'||v.total!==v.questionSnapshots.length)err('total does not match frozen question count');
-    if(typeof v.correctCount!=='number'||!Number.isInteger(v.correctCount)||v.correctCount<0||v.correctCount>v.total)err('invalid correctCount');
+    if(typeof v.total!=='number'||v.total!==snapshots.length)err('total does not match frozen question count');
+    if(typeof v.correctCount!=='number'||!Number.isInteger(v.correctCount)||v.correctCount<0||v.correctCount>(v.total as number))err('invalid correctCount');
     if(!v.answers||typeof v.answers!=='object'||Array.isArray(v.answers))err('invalid answers');
     const answers=v.answers as Record<string,unknown>;
     const snapshot=validateBank({
@@ -49,8 +50,9 @@ export function validateBackupData(input:unknown):ExamBackup{
     const idSet=new Set(snapshot.bank!.questions.map(q=>q.id));
     for(const [id,choice] of Object.entries(answers)){
       if(!idSet.has(id)||!Array.isArray(choice)||choice.some(a=>typeof a!=='string'))err('answers have invalid question or option values');
+      const choices=choice as string[];
       const options=new Set(snapshot.bank!.questions.find(q=>q.id===id)!.options.map(o=>o.id));
-      if(new Set(choice).size!==choice.length||choice.some(a=>!options.has(a)))err('answers contain unknown or duplicate choices');
+      if(new Set(choices).size!==choices.length||choices.some(a=>!options.has(a)))err('answers contain unknown or duplicate choices');
     }
     const computed=snapshot.bank!.questions.filter(q=>
       isCorrect(q,Object.hasOwn(answers,q.id)?answers[q.id] as string[]:[])
