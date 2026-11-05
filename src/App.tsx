@@ -316,7 +316,7 @@ export default function App() {
           <button key={id} onClick={()=>{setPage(id);setError('');}} className={'navbtn '+(page===id?'active':'')}><Icon size={18}/>{label}</button>
         )}
       </div>
-      <div className="sidefoot"><ShieldCheck size={16}/> Local-first · v0.2.1<br/><small>No cloud sync. Backup regularly.</small></div>
+      <div className="sidefoot"><ShieldCheck size={16}/> Local-first · v0.3.0-rc.1<br/><small>No cloud sync. Backup regularly.</small></div>
     </aside>
     <main className="main">
       <header className="top"><div><p className="eyebrow">EXAM PREPARATION WORKSPACE</p><h1>{page==='banks'?'Question Banks':page==='catalog'?'Certifications & Syllabi':page==='exam'?'Exam Simulator':page==='analytics'?'Learning Analytics':'Overview'}</h1></div><span className="tag">Browser-local storage</span></header>
