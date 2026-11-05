@@ -41,6 +41,6 @@ npm run test:e2e
 ## Operations
 - Question banks, exam answers and history are specific to each browser profile.
 - There is no cloud synchronization or server-side authentication.
-- Export encrypted backups routinely, retain the passphrase safely and periodically test restore.
+- Export encrypted backups routinely, retain the passphrase safely and periodically test restore. Current export/restore files are capped at 64 MiB; an oversized full-history backup is not supported, so keep the existing browser profile and use individual encrypted bank exports until a larger format is available.
 - Browser storage can be cleared by the user or operating system. Never treat the active browser database as the only durable copy.
 - Read the [security review](docs/SECURITY-REVIEW.md), [release-gate runbook](docs/releases/M0.1-RELEASE-GATES.md) and [roadmap](docs/ROADMAP.md).
