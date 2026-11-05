@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { ExamLock } from './examLock';
+import { completeActiveExam, createActiveExam, loadActiveExam, saveActiveExam } from './examPersistence';
 import { BookOpen, Upload, BarChart3, ShieldCheck, Download, Trash2, ArrowLeft, CheckCircle2, Clock3, Flag, Shuffle, Play } from 'lucide-react';
 import { db } from './db';
 import { isCorrect, shuffle, validateBank } from './logic';
@@ -19,6 +21,8 @@ export default function App() {
   const [attempts,setAttempts]=useState<Attempt[]>([]);
   const [session,setSession]=useState<ExamSession|null>(null);
   const [sessionLoaded,setSessionLoaded]=useState(false);
+  const [examAccess,setExamAccess]=useState<'checking'|'idle'|'owner'|'blocked'|'unsupported'>('checking');
+  const examLock=useRef(new ExamLock());
   const sessionWrites=useRef<Promise<void>>(Promise.resolve());
   const completing=useRef(false);
   const [viewResult,setViewResult]=useState<Attempt|null>(null);
@@ -36,31 +40,69 @@ export default function App() {
   useEffect(()=>{void reload().catch(()=>setError('Local database cannot be opened. Check browser storage settings.'));},[]);
   useEffect(()=>{
     let mounted=true;
-    void db.activeSessions.get('current').then(saved=>{
-      if(!mounted)return;
-      if(saved?.value){setSession(saved.value);return;}
-      // One-time migration from v0.1 tab-only session storage.
+    const lock=examLock.current;
+    async function restore(){
       try{
-        const previous=sessionStorage.getItem(SESSION_KEY);
-        if(previous){
-          const candidate:unknown=JSON.parse(previous);
-          if(candidate&&typeof candidate==='object'&&'id' in candidate&&'bank' in candidate&&'questions' in candidate&&'endsAt' in candidate){
-            const value=candidate as ExamSession;
-            if(typeof value.id==='string'&&typeof value.endsAt==='number'&&Array.isArray(value.questions)&&validateBank(value.bank).errors.length===0)setSession(value);
-          }
+        let saved=await loadActiveExam();
+        if(!mounted)return;
+        if(!saved){
+          // Legacy v0.1 tab-only data can only be migrated under exclusive ownership.
+          try{
+            const legacy=sessionStorage.getItem(SESSION_KEY);
+            const candidate:unknown=legacy?JSON.parse(legacy):null;
+            if(candidate&&typeof candidate==='object'&&'id' in candidate&&
+               'bank' in candidate&&'questions' in candidate&&'endsAt' in candidate){
+              const value=candidate as ExamSession;
+              if(typeof value.id==='string'&&typeof value.endsAt==='number'&&
+                 Array.isArray(value.questions)&&validateBank(value.bank).errors.length===0){
+                if(!lock.supported){setExamAccess('unsupported');return;}
+                if(!await lock.acquire()){setExamAccess('blocked');return;}
+                saved=await createActiveExam(value);
+                if(!mounted){await lock.release();return;}
+              }
+            }
+          }catch{/* An invalid legacy session must never become an active writer. */}
+          finally{sessionStorage.removeItem(SESSION_KEY);}
         }
-      }catch{/* Discard invalid legacy session data. */}
-    }).catch(()=>{if(mounted)setError('Unable to restore an unfinished exam from IndexedDB.');}).finally(()=>{if(mounted){setSessionLoaded(true);sessionStorage.removeItem(SESSION_KEY);}});
-    return ()=>{mounted=false;};
+        if(!saved){
+          setExamAccess(lock.supported?'idle':'unsupported');
+          return;
+        }
+        if(!lock.supported){setSession(saved);setPage('exam');setExamAccess('unsupported');return;}
+        if(!lock.owned && !await lock.acquire()){
+          if(mounted){setSession(saved);setPage('exam');setExamAccess('blocked');}
+          return;
+        }
+        const current=await loadActiveExam();
+        if(!mounted){await lock.release();return;}
+        if(current){setSession(current);setPage('exam');setExamAccess('owner');}
+        else{await lock.release();setSession(null);setExamAccess('idle');}
+      }catch{
+        if(mounted){setExamAccess('blocked');setError('Unable to recover the active examination safely. No data was changed.');}
+      }finally{if(mounted)setSessionLoaded(true);}
+    }
+    void restore();
+    return()=>{mounted=false;void lock.release();};
   },[]);
   useEffect(()=>{
-    if(!sessionLoaded)return;
+    if(!sessionLoaded||examAccess!=='owner'||!session)return;
     const current=session;
     sessionWrites.current=sessionWrites.current.then(async()=>{
-      if(current)await db.activeSessions.put({key:'current',value:current});
-      else await db.activeSessions.delete('current');
-    }).catch(()=>setError('Failed to autosave the exam session. Check browser storage.'));
-  },[session,sessionLoaded]);
+      if(!examLock.current.owned)throw new Error('Exam write lock lost');
+      await saveActiveExam(current);
+    }).catch(()=>setError('Failed to autosave the exam. Do not close this tab until storage access is restored.'));
+  },[session,sessionLoaded,examAccess]);
+
+  async function retryExamOwnership(){
+    const lock=examLock.current;
+    if(!sessionLoaded||!lock.supported){setExamAccess('unsupported');return;}
+    if(!await lock.acquire()){setExamAccess('blocked');return;}
+    try{
+      const saved=await loadActiveExam();
+      if(saved){setSession(saved);setNow(Date.now());setExamAccess('owner');setPage('exam');}
+      else{setSession(null);setExamAccess('idle');await lock.release();await reload();}
+    }catch{await lock.release();setExamAccess('blocked');setError('Exam recovery failed; existing saved data remains unchanged.');}
+  }
   useEffect(()=>{if(!session)return;const t=window.setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(t);},[session]);
 
   const bank=banks.find(b=>b.bank_id===selectedBank)??banks[0];
@@ -69,28 +111,24 @@ export default function App() {
   const timeLeft=session ? Math.max(0,Math.ceil((session.endsAt-now)/1000)) : 0;
 
   function completeExam(active:ExamSession){
-    if(completing.current)return;
+    if(completing.current||examAccess!=='owner'||!examLock.current.owned)return;
     completing.current=true;
-    const correctCount=active.questions.filter(q=>isCorrect(q,active.answers[q.id]??[])).length;
-    const record:Attempt={
-      id:active.id, bankId:active.bank.bank_id,bankTitle:active.bank.title,certification:active.bank.certification,
-      startedAt:active.startedAt,completedAt:new Date().toISOString(),durationSeconds:active.durationSeconds,
-      answers:active.answers,questionSnapshots:active.questions,correctCount,total:active.questions.length
-    };
-    // Persist the result and clear the active session in a single database transaction.
-    void sessionWrites.current.then(()=>db.transaction('rw',db.attempts,db.activeSessions,async()=>{
-      await db.attempts.put(record);
-      await db.activeSessions.delete('current');
-    })).then(async()=>{
-      setSession(null);setViewResult(record);setPage('exam');await reload();
-    }).catch(()=>setError('Exam submission could not be saved. Your unfinished exam is retained; retry after resolving storage access.'))
+    void sessionWrites.current.then(async()=>{
+      if(!examLock.current.owned)throw new Error('Exam write lock lost');
+      return completeActiveExam(active);
+    }).then(async record=>{
+      setSession(null);setViewResult(record);setPage('exam');
+      await examLock.current.release();
+      setExamAccess('idle');
+      await reload();
+    }).catch(()=>setError('Exam submission was not saved. Your active exam is retained; retry when storage is available.'))
       .finally(()=>{completing.current=false;});
   }
   useEffect(()=>{
-    if(session && timeLeft<=0) completeExam(session);
+    if(session && examAccess==='owner' && timeLeft<=0) completeExam(session);
     // Only timer expiry should trigger submission
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[timeLeft,session?.id]);
+  },[timeLeft,session?.id,examAccess]);
 
   async function importFile(file:File|undefined){
     if(!file)return;setError('');setNotice('');
@@ -113,18 +151,28 @@ export default function App() {
     if(!window.confirm('Delete this local question bank? Completed attempts remain available.'))return;
     await db.banks.delete(id);if(selectedBank===id)setSelectedBank('');await reload();
   }
-  function startExam(){
-    if(!bank || !eligible.length)return;
-    const questions=shuffle(eligible).slice(0,Math.min(examSize,eligible.length));
-    const start=new Date().toISOString();
-    setViewResult(null);
-    setSession({
-      id:crypto.randomUUID(),bank,questions,answers:{},marked:[],index:0,startedAt:start,
-      durationSeconds:examMinutes*60,endsAt:Date.now()+examMinutes*60000
-    });
-    setNow(Date.now());setPage('exam');
+  async function startExam(){
+    if(!bank||!eligible.length||!sessionLoaded||examAccess==='blocked'||examAccess==='checking')return;
+    const lock=examLock.current;
+    if(!lock.supported){setExamAccess('unsupported');setError('This browser cannot safely coordinate exams across tabs (Web Locks unavailable).');return;}
+    if(!await lock.acquire()){setExamAccess('blocked');setError('Another tab currently owns the active exam. Close it, then choose Resume here.');return;}
+    try{
+      const questions=shuffle(eligible).slice(0,Math.min(examSize,eligible.length));
+      const start=new Date().toISOString();
+      const proposed:ExamSession={
+        id:crypto.randomUUID(),bank,questions,answers:{},marked:[],index:0,startedAt:start,
+        durationSeconds:examMinutes*60,endsAt:Date.now()+examMinutes*60000
+      };
+      const actual=await createActiveExam(proposed);
+      setViewResult(null);setSession(actual);setNow(Date.now());setExamAccess('owner');setPage('exam');
+    }catch{
+      await lock.release();
+      setExamAccess('idle');
+      setError('Could not save the new exam. No existing exam data was overwritten.');
+    }
   }
   function answer(id:string,option:string,multi:boolean){
+    if(examAccess!=='owner'||!examLock.current.owned)return;
     setSession(old=>{
       if(!old)return old;
       const prev=old.answers[id]??[];
@@ -132,8 +180,8 @@ export default function App() {
       return {...old,answers:{...old.answers,[id]:next}};
     });
   }
-  function move(index:number){setSession(old=>old?{...old,index:Math.max(0,Math.min(old.questions.length-1,index))}:old);}
-  function flag(){setSession(old=>old?{...old,marked:old.marked.includes(old.questions[old.index].id)?old.marked.filter(x=>x!==old.questions[old.index].id):[...old.marked,old.questions[old.index].id]}:old);}
+  function move(index:number){if(examAccess!=='owner')return;setSession(old=>old?{...old,index:Math.max(0,Math.min(old.questions.length-1,index))}:old);}
+  function flag(){if(examAccess!=='owner')return;setSession(old=>old?{...old,marked:old.marked.includes(old.questions[old.index].id)?old.marked.filter(x=>x!==old.questions[old.index].id):[...old.marked,old.questions[old.index].id]}:old);}
   function saveJson(data:unknown,filename:string){
     const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
     const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;a.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);
@@ -192,7 +240,7 @@ export default function App() {
       <header className="top"><div><p className="eyebrow">EXAM PREPARATION WORKSPACE</p><h1>{page==='banks'?'Question Banks':page==='exam'?'Exam Simulator':page==='analytics'?'Learning Analytics':'Overview'}</h1></div><span className="tag">Browser-local storage</span></header>
       {error&&<div role="alert" className="alert bad"><strong>Action required</strong><pre>{error}</pre><button onClick={()=>setError('')}>Dismiss</button></div>}
       {notice&&<div role="status" className="alert good">{notice}<button onClick={()=>setNotice('')}>Dismiss</button></div>}
-      {session&&page!=='exam'&&<div className="alert warn">You have an examination in progress. <button onClick={()=>setPage('exam')}>Return to exam</button></div>}
+      {session&&page!=='exam'&&<div className="alert warn">{examAccess==='owner'?'You have an examination in progress.':'An examination is saved but this tab is not its active owner.'} <button onClick={()=>setPage('exam')}>View exam status</button></div>}
       {page==='dashboard'&&<div className="stack">
         <section className="hero"><div><span className="hero-kicker">READY WHEN YOU ARE</span><h2>Build confidence, one question at a time.</h2><p>Import your own JSON question banks, practise under exam conditions and follow your progress. All questions and results stay in this browser.</p><button className="primary" onClick={()=>setPage('banks')}>Manage question banks →</button></div><div className="hero-art"><BookOpen size={84}/></div></section>
         <section className="stats"><div className="stat"><span>Question banks</span><strong>{banks.length}</strong></div><div className="stat"><span>Questions available</span><strong>{totalQuestions}</strong></div><div className="stat"><span>Completed exams</span><strong>{attempts.length}</strong></div><div className="stat"><span>Average accuracy</span><strong>{pct(totalCorrect,totalAttempted)}%</strong></div></section>
@@ -208,7 +256,7 @@ export default function App() {
         <section className="panel result"><CheckCircle2 size={38}/><p className="eyebrow">EXAM COMPLETE</p><h2>{pct(viewResult.correctCount,viewResult.total)}% accuracy</h2><p>{viewResult.correctCount} of {viewResult.total} questions correct · {viewResult.certification} · {viewResult.bankTitle}</p><p className="muted">Practice accuracy is not equivalent to an official certification scaled score.</p></section>
         <section className="panel"><h3>Answer review</h3><div className="reviewlist">{viewResult.questionSnapshots.map((q,i)=><div key={q.id} className="review"><div className="sectionhead"><strong>{i+1}. {q.question}</strong><span className={'pill '+(isCorrect(q,viewResult.answers[q.id]??[])?'ok':'incorrect')}>{isCorrect(q,viewResult.answers[q.id]??[])?'Correct':'Incorrect'}</span></div>{q.options.map(o=><div className={'reviewoption '+(q.correct_answers.includes(o.id)?'correctoption':'')} key={o.id}><strong>{o.id}.</strong> {o.text}{q.correct_answers.includes(o.id)?' ✓':''}{(viewResult.answers[q.id]??[]).includes(o.id)?' · Your answer':''}</div>)}<p className="muted">{q.explanation}</p></div>)}</div></section>
       </div>}
-      {page==='exam'&&!session&&!viewResult&&<div className="stack"><section className="panel">
+      {page==='exam'&&!session&&!viewResult&&examAccess==='idle'&&<div className="stack"><section className="panel">
         <div className="sectionhead"><div><h3>Configure examination</h3><p className="muted">Generate a timed randomized practice paper.</p></div><Shuffle size={24}/></div>
         {banks.length===0?<div className="empty">Import a question bank before starting. <button className="primary" onClick={()=>setPage('banks')}>Import questions</button></div>:<div className="formgrid">
           <label>Question bank<select value={bank?.bank_id??''} onChange={e=>{setSelectedBank(e.target.value);setDomain('ALL');}}>{banks.map(b=><option key={b.bank_id} value={b.bank_id}>{b.certification} — {b.title}</option>)}</select></label>
@@ -216,10 +264,13 @@ export default function App() {
           <label>Number of questions<input type="number" min="1" max={Math.max(1,eligible.length)} value={examSize} onChange={e=>setExamSize(Math.max(1,Math.min(10000,Number(e.target.value)||1)))}/></label>
           <label>Duration (minutes)<input type="number" min="1" max="300" value={examMinutes} onChange={e=>setExamMinutes(Math.max(1,Math.min(300,Number(e.target.value)||1)))}/></label>
           <div className="full muted">{eligible.length} questions available in selected domain. An exam samples without replacement.</div>
-          <button className="primary full" disabled={!eligible.length} onClick={startExam}><Play size={18}/> Start examination</button>
+          <button className="primary full" disabled={!eligible.length||!sessionLoaded||examAccess!=='idle'} onClick={()=>void startExam()}><Play size={18}/> Start examination</button>
         </div>}
       </section></div>}
-      {page==='exam'&&session&&(()=>{const q=session.questions[session.index];const picked=session.answers[q.id]??[];return <div className="stack">
+      {page==='exam'&&session&&examAccess!=='owner'&&<section className="panel" role="status"><h3>Exam locked to another tab</h3><p className="muted">This tab is read-only. Your existing exam is preserved. To continue here, first close the owning exam tab, then select Resume here. Unsupported browser locking disables editing to protect your answers.</p><button className="primary" disabled={!sessionLoaded||examAccess==='unsupported'} onClick={()=>void retryExamOwnership()}>Resume here</button></section>}
+      {page==='exam'&&!session&&examAccess==='blocked'&&<section className="panel" role="status"><h3>Another tab owns the exam</h3><p className="muted">Close the owning tab before resuming; no local exam data has been modified.</p><button className="primary" onClick={()=>void retryExamOwnership()}>Resume here</button></section>}
+      {page==='exam'&&!session&&examAccess==='unsupported'&&<section className="panel" role="alert"><h3>Secure exam locking unavailable</h3><p className="muted">This browser does not expose the Web Locks API. Exams are disabled rather than allowing concurrent writes.</p></section>}
+      {page==='exam'&&session&&examAccess==='owner'&&(()=>{const q=session.questions[session.index];const picked=session.answers[q.id]??[];return <div className="stack">
         <section className="examtoolbar"><div><span className="eyebrow">{session.bank.certification} · {q.domain}</span><strong>Question {session.index+1} of {session.questions.length}</strong></div><div className={'timer '+(timeLeft<60?'urgent':'')}><Clock3 size={18}/> {fmtTime(timeLeft)}</div></section>
         <div className="progress"><progress aria-label="Exam progress" value={session.index+1} max={session.questions.length}/></div>
         <section className="panel questionpanel"><div className="sectionhead"><span className="pill">{q.type==='multiple_choice'?'Select all that apply':'Select one answer'}</span><button className="subtle" onClick={flag}><Flag size={16}/> {session.marked.includes(q.id)?'Unflag':'Flag'}</button></div><h2>{q.question}</h2><div className="choices">{q.options.map(o=><label className={'choice '+(picked.includes(o.id)?'selected':'')} key={o.id}><input type={q.type==='multiple_choice'?'checkbox':'radio'} name={'choice-'+q.id} checked={picked.includes(o.id)} onChange={()=>answer(q.id,o.id,q.type==='multiple_choice')}/><span className="letter">{o.id}</span><span>{o.text}</span></label>)}</div></section>
