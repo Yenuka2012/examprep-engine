@@ -2,7 +2,7 @@
 
 A free, browser-based, local-first exam preparation application for multiple certifications.
 
-## Available capabilities (v0.2.1 corrective release candidate)
+## Available capabilities (v0.2.1 deployed; M1.1 catalog in development)
 - JSON question-bank import with strict schema validation (single- and multiple-choice)
 - Timed examinations, question navigation, flags, scoring and answer review
 - Persistent local question banks, history, and unfinished exams using IndexedDB
@@ -37,6 +37,9 @@ npm run test:e2e
 
 ## Data format
 `samples/demo-bank.json` is the canonical import example. The schema permits 1–10,000 questions per bank, up to 8 answer options per question. Uploaded JSON must use `schema_version: "1.0"`.
+
+## M1.1 development branch
+Certification profile and syllabus catalog functionality is being developed in a feature branch. It will create an additive IndexedDB v3 schema and extend encrypted backups with optional validated catalog metadata. [Review the design](docs/architecture/M1.1-CATALOG-DESIGN.md). Do not confuse this feature branch with the deployed v0.2.1 release.
 
 ## Operations
 - Question banks, exam answers and history are specific to each browser profile.
