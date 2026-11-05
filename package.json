@@ -10,7 +10,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest run",
+    "test": "vitest run src",
     "typecheck": "tsc --noEmit",
     "audit": "npm audit --audit-level=high",
     "test:e2e": "playwright test"
