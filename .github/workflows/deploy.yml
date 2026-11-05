@@ -1,32 +1,38 @@
-name: Test, build and deploy Pages
+name: Validate and deploy ExamPrep
 on:
   push:
+    branches: [main]
+  pull_request:
     branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
 concurrency:
-  group: pages
+  group: examprep-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  test:
+  test-and-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run build
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Type check
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm test
+      - name: Build
+        run: npm run build
       - uses: actions/upload-artifact@v4
         with:
           name: site-dist
           path: dist/
   deploy:
-    needs: test
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: test-and-build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
