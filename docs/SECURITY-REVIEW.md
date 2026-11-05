@@ -1,46 +1,50 @@
-# ExamPrep Engine — Security review (v0.2.0)
+# ExamPrep Engine — Security review (v0.2.1 corrective candidate)
 
 ## System boundary
-- Publicly hosted static React SPA at GitHub Pages.
-- Imported question banks and exam attempts stay in browser IndexedDB.
-- No server-side identity, authorization, cloud sync, runtime AI keys, or backend.
-- Service worker caches built public assets only. It must not cache or upload private question data.
+- Public static React SPA hosted on GitHub Pages; no server-side identity, authorization, backend, cloud sync, runtime AI keys or third-party analytics.
+- Imported question banks, answer keys, completed attempts and unfinished exam state stay in browser IndexedDB.
+- Service worker caches public static assets only. Imported question content must never be cached in the service worker or uploaded.
+- Browser profile/local operating system access is a trusted boundary; IndexedDB remains **plaintext at rest**.
 
 ## Threat model
-| Threat | Relevant control | Residual risk |
+| Threat | Control in v0.2.1 candidate | Residual risk |
 |---|---|---|
-| Malicious JSON injection | Ajv strict schema, no rendering as HTML, bounded file sizes | Browser and dependency compromise still possible |
-| Dependency hijack | committed npm lockfile, npm ci, audit gate, Dependabot, minimal direct deps | Unknown zero-days and dependency release compromise |
-| Unauthorized local data access | No network synchronization, user device/browser security | IndexedDB is **not encrypted** |
-| Lost or stolen backup file | AES-256-GCM encrypted exports, PBKDF2-SHA256 with 600k iterations | Weak or reused passphrases can be guessed offline |
-| Corrupt backup | Authenticated encryption + strict question validation | Attempt history validation remains basic |
-| Stale exams or crashes | IndexedDB active-session migration + durable autosave | Browser storage may be evicted, tab racing not fully prevented |
-| XSS | React text escaping, restricted meta CSP, no unsafe HTML rendering | Meta CSP cannot enforce frame-ancestors or all HTTP-header policies |
-| CI supply-chain risk | Read-only verify token, privileged deploy job, immutable dependency lockfile | Action tags are release tags, not SHA-pinned yet |
+| Malicious bank JSON | Ajv strict schema, semantic references, size limits and React escaped text | Browser/dependency compromise; denial-of-service edge cases |
+| Dependency hijack | Locked exact npm dependencies, npm ci/audit, Dependabot, SHA-pinned GitHub Actions | Novel vulnerabilities, compromised upstream distribution |
+| Unauthorized local access | No sync; local browser profile controls | Browser storage is **not encrypted** and extensions may access it |
+| Lost backup file | AES-256-GCM encrypted bank/full exports; PBKDF2-SHA256 600k; random salt/nonce | Offline guessing of weak/reused passphrases |
+| Corrupt/malicious backup | Authenticated decryption; validated frozen snapshots/scores; merge-only atomic restore | Unfinished sessions excluded from backup v1 |
+| Stale exams/crash/two tabs | Web Locks exclusive owner; IndexedDB session migration; queued autosave, failed-write indicator, final durable flush | Browser storage eviction; abrupt OS/browser kill may interrupt any asynchronous write |
+| XSS/anti-framing | React text escaping and meta CSP; no unsafe HTML rendering | GitHub Pages does not permit all security response headers |
+| Unreviewed deployment | Verified same-run build/audit/tests/CodeQL gates, immutable Action commit pins | Main branch protections and independent human review **must be enforced in repository settings** |
 
 ## Implemented controls
-- File upload limit of 5 MiB; backup limit of 20 MiB; question limit of 10,000.
-- JSON Schema v1.0 validation with Ajv strict mode; rejects unrecognized fields.
-- AES-256-GCM encrypted backups with 16-byte random salt and 12-byte random nonce.
-- PBKDF2-HMAC-SHA256 key derivation using 600,000 iterations.
-- Authentication failure on decryption does not import data.
-- Strict TypeScript, unit tests, GitHub Actions npm ci and npm audit.
-- PWA caching of app shell only.
-- Unfinished exam state persists in IndexedDB; completed exam and session deletion are transactional.
+- Question bank import limit 5 MiB, symmetric encrypted backup export/restore cap 64 MiB, bank question limit 10,000; oversized full histories still need a future chunked export format.
+- JSON Schema 1.0 validated by Ajv strict mode; rejects unknown fields and duplicate/missing references.
+- AES-256-GCM encrypted exports: 16-byte random salt, 12-byte random IV, PBKDF2-HMAC-SHA-256 with 600,000 iterations.
+- All normal bank-export UI routes now encrypted; legacy plaintext exports can only be restored after a warning.
+- Web Locks fail closed on unsupported browsers; queued exam writes recheck current ownership when executing.
+- Autosave queue serializes writes and survives failures by allowing explicit retry. Final submit waits for the exact submitted state to persist or aborts.
+- Legacy sessionStorage is cleared only after a matching IndexedDB migration commits.
+- Validated restore merges without silently overwriting conflicting bank/attempt IDs; canonical JSON comparison avoids false conflicts caused solely by property order.
+- Unit tests, Chromium and desktop/mobile WebKit browser tests, CodeQL JavaScript/TypeScript and GitHub Actions analysis; clean-checkout dev bootstraps the generated CSP-safe validator.
+- CI deploy requires same-run verify, browser-tests, codeql-gate; Actions pinned to verified full commit SHAs.
+- CycloneDX SBOM and SHA-256 asset hash artifacts generated during verify. These are **not signed provenance**.
+- PWA caching limited to public app shell.
 
-## Outstanding security work (do not treat as completed)
-1. Optional encrypted-at-rest question vault with explicit lock/unlock and threat-model review.
-2. Full test coverage for backup restoration and session lifecycle.
-3. Browser-based end-to-end tests (Chromium/Firefox/WebKit) and accessibility checks.
-4. SHA-pinning every GitHub Action after verifying full immutable commit digests.
-5. CSP enforcement through server response headers where supported (GitHub Pages limitations).
-6. Formal SBOM, SAST, secret scanning configuration, and provenance attestation.
-7. Reliable cross-tab concurrency control and backup integrity/version migrations.
-8. Secure multi-user service architecture only if future requirements demand it.
+## Outstanding security work — not certified complete
+1. Owner-enforced GitHub branch ruleset, required checks, independent PR approval, manual public HTTPS and physical iOS smoke tests.
+2. Optional encrypted-at-rest vault with a fully reviewed key lifecycle; do not imply IndexedDB is currently private from browser-profile compromise.
+3. Offline active-exam recovery from storage eviction: backup v1 excludes unfinished sessions, and browser storage persistence is advisory.
+4. Browser Firefox coverage, accessibility audit, larger fault-injection/multi-tab stress suite and repeatable mobile Safari manual checks.
+5. HTTP header-level CSP and anti-framing controls where infrastructure supports them (GitHub Pages limitations persist).
+6. Credential/secret scanning policy, signed release provenance/attestations, dependency alert triage and release-risk acceptance.
+7. Full exam state-machine separation and immutable bank-revision/attempt version management.
+8. A separate server-side security design if accounts, cloud sync, authorization or AI integration are later authorized.
 
 ## Operational guidance
-- Do not publish real private question banks into the public repository.
-- Use a strong unique backup passphrase. Store it in a password manager.
-- Do not rely solely on browser storage; periodically export and test encrypted backups.
-- Browsers and extensions with access to the unlocked profile may access question content.
-- Do not represent this as certified to OWASP ASVS, ISO/IEC 27001, or other standards.
+- Do not publish private/licensed question banks in source control, public issues or CI fixtures.
+- Use a strong unique export passphrase and keep it in a password manager.
+- Validate recovery periodically in a separate browser profile; no backend stores your data.
+- Browser crashes, extensions, OS profile compromise and Safari/iOS storage pressure remain meaningful risks.
+- This project is not certified against OWASP ASVS, ISO/IEC 27001 or other external standards.

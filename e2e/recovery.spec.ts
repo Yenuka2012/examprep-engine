@@ -107,3 +107,22 @@ test('IndexedDB version 1 bank records migrate to version 2 without data loss',a
   // Dexie maps schema version 2 to native IndexedDB version 20.
   expect(state).toEqual({version:20,bankCount:1,sessionStore:true});
 });
+
+
+test('semantically identical restore ignores JSON object property order',async({page})=>{
+  const reorder=(value:unknown):unknown=>{
+    if(Array.isArray(value))return value.map(reorder);
+    if(value && typeof value==='object'){
+      return Object.fromEntries(Object.entries(value).reverse().map(([key,entry])=>[key,reorder(entry)]));
+    }
+    return value;
+  };
+  await page.goto('/examprep-engine/');
+  await banksButton(page).click();
+  page.on('dialog',dialog=>dialog.accept());
+  await page.getByLabel('Restore encrypted or legacy backup').setInputFiles(upload(legacy));
+  await expect(page.getByText(/Recovery complete: 1 new banks and 0 new attempts/)).toBeVisible();
+  await page.getByLabel('Restore encrypted or legacy backup').setInputFiles(upload(reorder(legacy)));
+  await expect(page.getByText(/Recovery complete: 0 new banks and 0 new attempts/)).toBeVisible();
+  await expect(page.getByText('Legacy Recovery Verification Bank').first()).toBeVisible();
+});

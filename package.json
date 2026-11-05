@@ -1,6 +1,6 @@
 {
   "name": "examprep-engine",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "type": "module",
   "engines": {
@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "vite",
+    "predev": "npm run generate:validator",
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run src",

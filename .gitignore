@@ -7,6 +7,8 @@ coverage/
 .DS_Store
 private-question-banks/
 *.backup.json
-\ntest-results/\nplaywright-report/\n
+test-results/
+playwright-report/
+
 # Generated build-time CSP-safe schema validators
 src/generated/
