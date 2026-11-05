@@ -20,11 +20,16 @@ export async function decodeBackup(raw:unknown,passphrase:string):Promise<{kind:
     return {kind:'encrypted',data:validateBackupData(await decryptBackup(raw,passphrase))};
   }
   if(record(raw)&&raw.backup_version===1){
-    // The v0.1 exporter wrote plaintext JSON in precisely this format.
-    // Never write recovered plaintext back to disk automatically.
+    // Legacy plaintext is permitted only for logical v1, with UI warning.
+    // The validator rejects v1 payloads that carry v2-only catalog fields.
     return {kind:'legacy-plaintext',data:validateBackupData(raw)};
   }
-  throw new Error('Unrecognized backup. Expected an encrypted v0.2 or legacy v0.1 JSON export');
+  if(record(raw)&&raw.backup_version===2){
+    // v2 catalog data MUST be encrypted before it is exported or restored.
+    // This prevents introducing a new accidental plaintext backup path.
+    throw new Error('Version 2 catalog backups must be encrypted');
+  }
+  throw new Error('Unrecognized backup. Expected encrypted v1/v2 or legacy plaintext v1 JSON export');
 }
 
 /**
