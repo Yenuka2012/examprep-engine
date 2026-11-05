@@ -22,7 +22,7 @@ function date(x:unknown):string{
   return x;
 }
 function id(x:unknown,label:string):string{
-  if(typeof x!=='string'||!IDENTIFIER.test(x))throw new Error('Invalid '+label+'; use letters, numbers, ., _, :, -');
+  if(typeof x!=='string'||!IDENTIFIER.test(x)||['__proto__','prototype','constructor'].includes(x.toLowerCase()))throw new Error('Invalid '+label+'; use letters, numbers, ., _, :, - and avoid reserved identifiers');
   return x;
 }
 export function syllabusKey(certificationId:string,version:string):string{
