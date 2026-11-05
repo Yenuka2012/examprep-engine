@@ -7,8 +7,8 @@
 
 ## Release v0.2.1 — M0.1 corrective maintenance (candidate)
 - Failure-aware queued autosave, explicit retry/status and final durable submission barrier.
-- Legacy tab-only exam state preserved until committed IndexedDB migration.
-- Encrypted-only whole-profile and individual bank exports with fresh-profile restore tests.
+- Legacy tab-only exam state preserved until committed IndexedDB migration; clean-checkout dev validator generation and gitignore repairs.
+- Encrypted-only whole-profile and individual bank exports with fresh-profile restore tests, 64 MiB symmetric size bounds and property-order-insensitive restore matching.
 - Same-run Pages deployment gates: unit/build/audit, desktop/mobile Playwright and CodeQL.
 - Immutable GitHub Action pins; CycloneDX SBOM, SHA-256 build manifest and release rollback runbook.
 - Release remains blocked until required branch ruleset, human review and live iOS/site acceptance.
