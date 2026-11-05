@@ -26,7 +26,12 @@ export default function App() {
   const [sessionLoaded,setSessionLoaded]=useState(false);
   const [examAccess,setExamAccess]=useState<'checking'|'idle'|'owner'|'blocked'|'unsupported'>('checking');
   const examLock=useRef(new ExamLock());
-  const sessionWrites=useRef(new SessionSaveQueue<ExamSession>(saveActiveExam));
+  const sessionWrites=useRef(new SessionSaveQueue<ExamSession>(async snapshot=>{
+    // Enforce the cross-tab single-writer invariant at the point of every write,
+    // including queued work that resumes after this tab loses its Web Lock.
+    if(!examLock.current.owned)throw new Error('Exam write lock lost');
+    await saveActiveExam(snapshot);
+  }));
   const saveSerial=useRef(0);
   const [saveStatus,setSaveStatus]=useState<'saved'|'saving'|'failed'>('saved');
   const completing=useRef(false);
