@@ -5,7 +5,7 @@ export default defineConfig({
   plugins:[
     react(),
     VitePWA({
-      registerType:'autoUpdate',
+      registerType:'prompt',
       includeAssets:['favicon.svg'],
       manifest:{
         id:'/examprep-engine/',
@@ -23,6 +23,8 @@ export default defineConfig({
         globPatterns:['**/*.{js,css,html,svg,webmanifest}'],
         navigateFallback:'/examprep-engine/index.html',
         cleanupOutdatedCaches:true,
+        clientsClaim:false,
+        skipWaiting:false,
         runtimeCaching:[]
       }
     })
