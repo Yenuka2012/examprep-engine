@@ -1,0 +1,39 @@
+import {test,expect,type Page} from '@playwright/test';
+
+async function importSample(page:Page){
+  await page.goto('/examprep-engine/');
+  await page.getByRole('button',{name:'Question Banks'}).click();
+  await page.locator('input[type="file"]').first().setInputFiles('samples/demo-bank.json');
+  await expect(page.getByText('Cybersecurity Fundamentals Demo').first()).toBeVisible();
+}
+async function startExam(page:Page){
+  await page.getByRole('button',{name:'Practise'}).first().click();
+  await page.getByRole('button',{name:'Start examination'}).click();
+  await expect(page.getByText(/Question 1 of/)).toBeVisible();
+}
+test('exam recovers progress and deadline after hard reload',async({page})=>{
+  await importSample(page);await startExam(page);
+  await page.getByRole('button',{name:'Flag'}).click();
+  await page.getByRole('button',{name:'Next →'}).click();
+  await expect(page.getByText(/Question 2 of/)).toBeVisible();
+  await page.reload();
+  await expect(page.getByText(/Question 2 of/)).toBeVisible();
+  await page.getByRole('button',{name:'Previous ←'}).click().catch(async()=>{
+    await page.getByRole('button',{name:/Previous/}).click();
+  });
+  await expect(page.getByRole('button',{name:'Unflag'})).toBeVisible();
+});
+
+test('only one tab can write an active examination and a second tab can take over safely',async({context,page})=>{
+  await importSample(page);await startExam(page);
+  const second=await context.newPage();
+  await second.goto('/examprep-engine/');
+  await second.getByRole('button',{name:'Exam Simulator'}).click();
+  await expect(second.getByText('Exam locked to another tab')).toBeVisible();
+  await expect(second.getByRole('button',{name:'Resume here'})).toBeVisible();
+  await page.close();
+  await second.getByRole('button',{name:'Resume here'}).click();
+  await expect(second.getByText(/Question 1 of/)).toBeVisible();
+  await second.getByRole('button',{name:'Submit exam'}).click();
+  second.once('dialog',dialog=>dialog.accept());
+});
