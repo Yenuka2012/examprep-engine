@@ -33,6 +33,7 @@ describe('M0 active exam recovery validation',()=>{
  });
  it('rejects duplicate question snapshots',()=>{
   const s=session();
-  expect(()=>validateExamSession({...s,questions:[q,q]})).toThrow(/Duplicate/);
+  const other={...q,id:'Q2'};
+  expect(()=>validateExamSession({...s,bank:{...bank,questions:[q,other]},questions:[q,q]})).toThrow(/Duplicate/);
  });
 });
