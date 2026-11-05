@@ -16,6 +16,22 @@ test('exam recovers progress and deadline after hard reload',async({page})=>{
   await page.getByRole('button',{name:'Flag'}).click();
   await page.getByRole('button',{name:'Next →'}).click();
   await expect(page.getByText(/Question 2 of/)).toBeVisible();
+  // Wait for the actual IndexedDB commit rather than a UI-only React state update.
+  await page.waitForFunction(async()=>new Promise<boolean>(resolve=>{
+    const opening=indexedDB.open('examprep-v1');
+    opening.onerror=()=>resolve(false);
+    opening.onsuccess=()=>{
+      const database=opening.result;
+      const tx=database.transaction('activeSessions','readonly');
+      const get=tx.objectStore('activeSessions').get('current');
+      get.onsuccess=()=>{
+        const saved=get.result?.value as {index:number;marked:string[]}|undefined;
+        resolve(saved?.index===1&&saved.marked?.length===1);
+        database.close();
+      };
+      get.onerror=()=>{resolve(false);database.close();};
+    };
+  }),undefined,{timeout:12000});
   await page.reload();
   await expect(page.getByText(/Question 2 of/)).toBeVisible();
   await page.getByRole('button',{name:/Previous/}).click();
