@@ -61,7 +61,7 @@ test('encrypted backup restores into a fresh browser profile after local storage
   }finally{await fresh.close();}
 });
 
-test('IndexedDB version 1 bank records migrate to version 2 without data loss',async({page})=>{
+test('IndexedDB version 1 bank records migrate to version 3 without data loss',async({page})=>{
   // Serve a blank same-origin page so no application JS opens/upgrades Dexie before we seed v1.
   await page.route('**/examprep-engine/migration-bootstrap',route=>route.fulfill({
     status:200,contentType:'text/html',body:'<!doctype html><title>Migration fixture</title>'
@@ -92,20 +92,22 @@ test('IndexedDB version 1 bank records migrate to version 2 without data loss',a
   await page.goto('/examprep-engine/');
   await banksButton(page).click();
   await expect(page.getByText('Legacy Recovery Verification Bank').first()).toBeVisible();
-  const state=await page.evaluate(async()=>new Promise<{version:number;bankCount:number;sessionStore:boolean}>((resolve,reject)=>{
+  const state=await page.evaluate(async()=>new Promise<{version:number;bankCount:number;sessionStore:boolean;certStore:boolean;syllabusStore:boolean}>((resolve,reject)=>{
     const request=indexedDB.open('examprep-v1');
     request.onerror=()=>reject(request.error);
     request.onsuccess=()=>{
       const database=request.result;
       const sessionStore=database.objectStoreNames.contains('activeSessions');
+      const certStore=database.objectStoreNames.contains('certifications');
+      const syllabusStore=database.objectStoreNames.contains('syllabusVersions');
       const tx=database.transaction('banks','readonly');
       const count=tx.objectStore('banks').count();
-      count.onsuccess=()=>{resolve({version:database.version,bankCount:count.result,sessionStore});database.close();};
+      count.onsuccess=()=>{resolve({version:database.version,bankCount:count.result,sessionStore,certStore,syllabusStore});database.close();};
       count.onerror=()=>{reject(count.error);database.close();};
     };
   }));
-  // Dexie maps schema version 2 to native IndexedDB version 20.
-  expect(state).toEqual({version:20,bankCount:1,sessionStore:true});
+  // Dexie maps schema version 3 to native IndexedDB version 30, preserving v1 data.
+  expect(state).toEqual({version:30,bankCount:1,sessionStore:true,certStore:true,syllabusStore:true});
 });
 
 
