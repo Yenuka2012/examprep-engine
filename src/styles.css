@@ -11,3 +11,17 @@
 .progress progress::-webkit-progress-bar,.meter progress::-webkit-progress-bar{background:#2a3750;border-radius:20px}
 .progress progress::-webkit-progress-value,.meter progress::-webkit-progress-value{background:#7688fa;border-radius:20px}
 .progress progress::-moz-progress-bar,.meter progress::-moz-progress-bar{background:#7688fa;border-radius:20px}
+
+/* Certification catalogue forms: accessible contrast, mobile-friendly layout. */
+.catalog .formgrid{align-items:end}
+.catalog textarea{font:inherit;line-height:1.5;background:#222d44;border:1px solid #3e4b65;color:#fff;padding:12px;border-radius:9px;width:100%;resize:vertical}
+.catalog textarea:focus-visible,.catalog input:focus-visible,.catalog select:focus-visible{outline:2px solid #a9b5ff;outline-offset:2px}
+.catalog-version-list,.catalog-domains{display:grid;gap:12px;margin:12px 0 22px}
+.catalog-version,.catalog-domain{border:1px solid #38455e;background:#172238;border-radius:12px;padding:17px}
+.catalog-version{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.catalog-version strong{display:block;margin-bottom:6px}
+.catalog-version a{display:inline-block;margin-top:8px;color:#afbbff;text-decoration:underline}
+.catalog-domain .formgrid{margin-bottom:12px}
+.catalog h4{font-size:17px;margin:8px 0}
+.catalog .actions{flex-wrap:wrap}
+@media(max-width:600px){.catalog-version{align-items:flex-start}.catalog .actions button{min-height:42px}}
