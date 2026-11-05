@@ -1,33 +1,41 @@
 # ExamPrep Engine
-Personal, local-first examination engine for JSON question banks.
 
-## Current status
-v0.1.0 development release: question-bank import, validation, browser persistence, timed exams, answer review, domain analytics and manual JSON backup/restore.
+A free, browser-based, local-first exam preparation application for multiple certifications.
 
-### Security and limitations
-- Browser local data is **not encrypted at rest**.
-- Backup exports are **not encrypted**.
-- No cloud synchronization, login, production-grade authorization, PWA offline caching, or AI API integration.
-- Public source code on GitHub Pages does not contain imported question banks.
-- This is a personal study tool, not an officially certified examination system.
-- The sample questions are illustrative and not official certification exam questions.
+## Available capabilities (v0.2.0 candidate)
+- JSON question-bank import with strict schema validation (single- and multiple-choice)
+- Timed examinations, question navigation, flags, scoring and answer review
+- Persistent local question banks, history, and unfinished exams using IndexedDB
+- Domain-level learning analytics
+- AES-256-GCM encrypted JSON backup export and restore
+- Scoped offline-capable PWA (after first online load)
+- CI typechecking, unit/security tests, reproducible npm ci, dependency audit and GitHub Pages deployment
 
-## GitHub Pages setup
-1. Merge the development pull request into main.
-2. Under Settings → Pages, set Source to **GitHub Actions**.
-3. Open Actions and inspect the **Test, build and deploy Pages** workflow.
-4. Site URL: https://Yenuka2012.github.io/examprep-engine/
+## Security boundaries
+The application source is public. Uploaded questions and answers stay in local browser storage, **not encrypted at rest**. Encrypted backups require a strong unique passphrase. This is not an officially endorsed or proctored exam system.
 
-## JSON question bank format
-Use `samples/demo-bank.json` as the reference. Each question needs a unique `id`, `type` (`single_choice` or `multiple_choice`), `domain`, `question`, `options`, `correct_answers`, and `explanation`.
-Import JSON through **Question Banks** inside the app. Imported question banks stay in the local browser profile.
+## Deployment
+1. Review the [security modernization pull request](https://github.com/Yenuka2012/examprep-engine/pulls) and verify all checks pass.
+2. Merge to `main` after validation.
+3. Set **Settings → Pages → Source → GitHub Actions**.
+4. Open https://Yenuka2012.github.io/examprep-engine/ after a successful Pages deployment.
+5. Download the [sample bank](samples/demo-bank.json) and import it through **Question Banks**.
 
-## Recovery
-Export a JSON backup periodically. Restore backups through Question Banks. Store exported backups securely; they are unencrypted.
+## Development pipeline
+GitHub Actions performs the work without a local environment:
+```sh
+npm ci
+npm audit --audit-level=high
+npm run typecheck
+npm test
+npm run build
+```
 
-## Development
-`npm install`, `npm run typecheck`, `npm test`, `npm run build`.
-GitHub Actions runs the build automatically; a local terminal is not required for deployment.
+## Data format
+`samples/demo-bank.json` is the canonical import example. The schema permits 1–10,000 questions per bank, up to 8 answer options per question. Uploaded JSON must use `schema_version: "1.0"`.
 
-## Planned v0.2
-Encrypted backups, JSON schema hardening, PWA offline caching, question revisioning, study planner, richer analytics, E2E browser tests, and stronger CI security gates.
+## Operations
+- Question banks, exam answers and history are specific to each browser profile.
+- There is no cloud synchronization or server-side authentication.
+- Export encrypted backups routinely, retain the passphrase safely and periodically test restore.
+- Read the [security review](docs/SECURITY-REVIEW.md) and [roadmap](docs/ROADMAP.md).
