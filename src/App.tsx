@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ExamLock } from './examLock';
 import { SessionSaveQueue } from './saveQueue';
+import {assertRestorableBackupSize,MAX_BACKUP_FILE_BYTES} from './backupSize';
 import PwaStatus from './PwaStatus';
 import { completeActiveExam, createActiveExam, loadActiveExam, saveActiveExam } from './examPersistence';
 import { BookOpen, Upload, BarChart3, ShieldCheck, Download, Trash2, ArrowLeft, CheckCircle2, Clock3, Flag, Shuffle, Play } from 'lucide-react';
@@ -232,6 +233,7 @@ export default function App() {
   function flag(){if(examAccess!=='owner')return;setSession(old=>old?{...old,marked:old.marked.includes(old.questions[old.index].id)?old.marked.filter(x=>x!==old.questions[old.index].id):[...old.marked,old.questions[old.index].id]}:old);}
   function saveEncryptedJson(data:EncryptedBackup,filename:string){
     const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+    assertRestorableBackupSize(blob.size);
     const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;a.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);
   }
   async function exportBankEncrypted(selected:QuestionBank){
@@ -251,18 +253,19 @@ export default function App() {
     finally{setBackupPassphrase('');setBusy(false);}
   }
   async function backup(){
-    setError('');
+    if(busy)return;
+    setError('');setBusy(true);
     try{
       const data={backup_version:1,exported_at:new Date().toISOString(),banks:await db.banks.toArray(),attempts:await db.attempts.toArray()};
       const encrypted=await encryptBackup(data,backupPassphrase);
       saveEncryptedJson(encrypted,'examprep-ENCRYPTED-'+new Date().toISOString().slice(0,10)+'.json');
       setNotice('Encrypted backup exported. Keep the passphrase safe; it cannot be recovered.');
     }catch(e){setError(e instanceof Error?e.message:'Backup encryption failed');}
-    finally{setBackupPassphrase('');}
+    finally{setBackupPassphrase('');setBusy(false);}
   }
   async function restore(file:File|undefined){
     if(!file)return;setError('');setNotice('');
-    if(file.size>MAX_FILE_BYTES*4){setError('Backup exceeds 20 MiB');return;}
+    if(file.size>MAX_BACKUP_FILE_BYTES){setError('Backup exceeds the 64 MiB restore limit. Existing data was not changed.');return;}
     setBusy(true);
     try{
       const raw:unknown=JSON.parse(await file.text());
@@ -316,7 +319,7 @@ export default function App() {
       {page==='banks'&&<div className="stack">
         <section className="panel"><div className="sectionhead"><div><h3>Import a JSON question bank</h3><p className="muted">Validated locally. Files never leave your browser.</p></div><Upload size={24}/></div><label className="upload"><input type="file" accept=".json,application/json" disabled={busy} onChange={e=>{void importFile(e.target.files?.[0]);e.currentTarget.value='';}}/><Upload size={26}/><strong>{busy?'Importing…':'Choose a JSON file'}</strong><small>Maximum 5 MiB · Schema v1.0 · Up to 10,000 questions</small></label><p className="muted">Try the provided sample at <code>samples/demo-bank.json</code>. The importer rejects invalid answer keys, duplicate IDs and unsupported question types.</p></section>
         <section className="panel"><div className="sectionhead"><h3>Imported banks</h3><span className="tag">{banks.length} banks</span></div>{banks.length===0?<p className="empty">No question banks imported yet.</p>:<div className="bankgrid">{banks.map(b=><div className="bankcard" key={b.bank_id}><span className="pill">{b.certification}</span><h4>{b.title}</h4><p>{b.questions.length} questions · {[...new Set(b.questions.map(q=>q.domain))].length} domains</p><div className="actions"><button className="primary small" onClick={()=>{setSelectedBank(b.bank_id);setDomain('ALL');setViewResult(null);setPage('exam');}}>Practise</button><button className="subtle small" disabled={busy} onClick={()=>void exportBankEncrypted(b)}><Download size={15}/> Export encrypted</button><button className="danger small" aria-label={'Delete '+b.title} onClick={()=>void deleteBank(b.bank_id)}><Trash2 size={15}/></button></div></div>)}</div>}</section>
-        <section className="panel"><div className="sectionhead"><h3>Data portability</h3><ShieldCheck size={20}/></div><p className="muted">All question-bank exports and full backups are encrypted with AES-256-GCM. Enter the passphrase here before either export; it is never stored. Losing it means losing access to the backup. Browser IndexedDB remains unencrypted.</p><label className="backup-passphrase">Backup passphrase (at least 12 characters)<input autoComplete="new-password" type="password" value={backupPassphrase} onChange={e=>setBackupPassphrase(e.target.value)} placeholder="Enter a strong unique passphrase" /></label><div className="actions"><button className="secondary" disabled={backupPassphrase.length<12} onClick={()=>void backup()}><Download size={16}/> Export encrypted backup</button><label className="buttonlike">Restore encrypted or legacy backup<input hidden type="file" disabled={busy} accept=".json,application/json" onChange={e=>{void restore(e.target.files?.[0]);e.currentTarget.value='';}}/></label><button className="secondary" disabled={busy} onClick={()=>void enablePersistentStorage()}>Request persistent storage</button></div><p className="muted">Restore is merge-only: existing records are never silently replaced. Legacy plaintext backup files are accepted only after explicit warning. Browser storage persistence: {persistenceStatus}. Active exams are excluded from backup; complete the exam first.</p></section>
+        <section className="panel"><div className="sectionhead"><h3>Data portability</h3><ShieldCheck size={20}/></div><p className="muted">All question-bank exports and full backups are encrypted with AES-256-GCM. Enter the passphrase here before either export; it is never stored. Losing it means losing access to the backup. Browser IndexedDB remains unencrypted.</p><label className="backup-passphrase">Backup passphrase (at least 12 characters)<input autoComplete="new-password" type="password" value={backupPassphrase} onChange={e=>setBackupPassphrase(e.target.value)} placeholder="Enter a strong unique passphrase" /></label><div className="actions"><button className="secondary" disabled={backupPassphrase.length<12||busy} onClick={()=>void backup()}><Download size={16}/> Export encrypted backup</button><label className="buttonlike">Restore encrypted or legacy backup<input hidden type="file" disabled={busy} accept=".json,application/json" onChange={e=>{void restore(e.target.files?.[0]);e.currentTarget.value='';}}/></label><button className="secondary" disabled={busy} onClick={()=>void enablePersistentStorage()}>Request persistent storage</button></div><p className="muted">Restore is merge-only: existing records are never silently replaced. Legacy plaintext backup files are accepted only after explicit warning. Browser storage persistence: {persistenceStatus}. Active exams are excluded from backup; complete the exam first.</p></section>
       </div>}
       {page==='exam'&&!session&&viewResult&&<div className="stack">
         <button className="subtle back" onClick={()=>setViewResult(null)}><ArrowLeft size={16}/> Back to exam setup</button>
@@ -351,7 +354,7 @@ export default function App() {
         <section className="stats"><div className="stat"><span>Completed exams</span><strong>{attempts.length}</strong></div><div className="stat"><span>Questions answered</span><strong>{totalAttempted}</strong></div><div className="stat"><span>Total correct</span><strong>{totalCorrect}</strong></div><div className="stat"><span>Overall accuracy</span><strong>{pct(totalCorrect,totalAttempted)}%</strong></div></section>
         <section className="panel"><h3>Domain performance</h3>{domainStats.length===0?<p className="empty">Take an exam to view your performance by domain.</p>:<div className="domains">{domainStats.map(d=><div key={d.name} className="domainrow"><div className="sectionhead"><strong>{d.name}</strong><span>{d.correct}/{d.total} · {pct(d.correct,d.total)}%</span></div><div className="meter"><progress aria-label={d.name+' accuracy'} value={d.correct} max={d.total}/></div></div>)}</div>}</section>
         <section className="panel"><h3>Exam history</h3>{attempts.length===0?<p className="empty">No completed attempts yet.</p>:<div className="records">{attempts.map(a=><button className="record" key={a.id} onClick={()=>{setViewResult(a);setPage('exam');}}><div><strong>{a.certification} — {a.bankTitle}</strong><small>{formatDate(a.completedAt)} · {a.total} questions</small></div><strong>{pct(a.correctCount,a.total)}%</strong></button>)}</div>}</section>
-        <section className="panel"><h3>Backup and recovery</h3><p className="muted">Export exam history and banks encrypted with a strong passphrase using AES-256-GCM.</p><label className="backup-passphrase">Backup passphrase<input autoComplete="new-password" type="password" value={backupPassphrase} onChange={e=>setBackupPassphrase(e.target.value)} placeholder="At least 12 characters" /></label><button className="secondary" disabled={backupPassphrase.length<12} onClick={()=>void backup()}><Download size={16}/> Export encrypted backup</button></section>
+        <section className="panel"><h3>Backup and recovery</h3><p className="muted">Export exam history and banks encrypted with a strong passphrase using AES-256-GCM.</p><label className="backup-passphrase">Backup passphrase<input autoComplete="new-password" type="password" value={backupPassphrase} onChange={e=>setBackupPassphrase(e.target.value)} placeholder="At least 12 characters" /></label><button className="secondary" disabled={backupPassphrase.length<12||busy} onClick={()=>void backup()}><Download size={16}/> Export encrypted backup</button></section>
       </div>}
       <footer>ExamPrep Engine v0.2.0 · Your data stays in this browser · Not affiliated with certification providers</footer>
     </main>
