@@ -47,8 +47,8 @@ export async function restoreBackup(data:ExamBackup):Promise<Omit<RestoreResult,
       }
       const newBanks:typeof validated.banks=[];
       const newAttempts:typeof validated.attempts=[];
-      const newCertifications=validated.certifications?.filter(()=>true)??[];
-      const newSyllabi=validated.syllabi?.filter(()=>true)??[];
+      const newCertifications=[...(validated.certifications??[])];
+      const newSyllabi=[...(validated.syllabi??[])];
       for(const bank of validated.banks){
         const present=await db.banks.get(bank.bank_id);
         if(present){
