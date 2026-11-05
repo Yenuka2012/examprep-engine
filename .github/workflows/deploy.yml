@@ -27,6 +27,12 @@ jobs:
         run: npm ci --no-fund
       - name: Dependency vulnerability gate
         run: npm audit --audit-level=high
+      - name: Clean-checkout development validator bootstrap
+        run: |
+          test ! -e src/generated/validate-bank.js
+          npm run predev
+          test -s src/generated/validate-bank.js
+          test -s src/generated/validate-bank.d.ts
       - name: Strict TypeScript validation
         run: npm run typecheck
       - name: Unit and security tests
