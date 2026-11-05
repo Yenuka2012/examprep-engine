@@ -17,7 +17,7 @@
 
 ### M1.1 — Certification catalog (in development)
 - Additive IndexedDB v3 profiles with immutable published syllabus versions, weights and objectives.
-- Backwards-compatible encrypted catalog export/restore, draft revision protection, UI and browser tests.
+- Logical backup v2 (with a backwards-compatible decrypting reader for v1), draft revision protection, UI and browser tests. An older v0.2.1 reader intentionally rejects new logical v2 backups, preventing catalog data loss.
 - [Technical design](architecture/M1.1-CATALOG-DESIGN.md); UX-001 #58. This is not yet a production release.
 
 ### M1.2+ — Question-bank and adaptive intelligence
