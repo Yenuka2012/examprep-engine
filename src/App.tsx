@@ -1,15 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { BookOpen, Upload, BarChart3, ShieldCheck, Download, Trash2, ArrowLeft, CheckCircle2, Clock3, Flag, Shuffle, Play } from 'lucide-react';
 import { db } from './db';
 import { isCorrect, shuffle, validateBank } from './logic';
 import { encryptBackup, decryptBackup, isEncryptedBackup, type EncryptedBackup } from './crypto';
-import type { Attempt, Question, QuestionBank } from './types';
+import type { Attempt, ExamSession, Question, QuestionBank } from './types';
 
 type Page = 'dashboard' | 'banks' | 'exam' | 'analytics';
-type Session = {
-  id: string; bank: QuestionBank; questions: Question[]; answers: Record<string,string[]>;
-  marked: string[]; index: number; startedAt: string; endsAt: number; durationSeconds: number;
-};
 const SESSION_KEY = 'examprep-active-session-v1';
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 function fmtTime(seconds:number) { const s=Math.max(0,Math.floor(seconds)); return Math.floor(s/60).toString().padStart(2,'0')+':'+(s%60).toString().padStart(2,'0'); }
@@ -20,9 +16,10 @@ export default function App() {
   const [page,setPage]=useState<Page>('dashboard');
   const [banks,setBanks]=useState<QuestionBank[]>([]);
   const [attempts,setAttempts]=useState<Attempt[]>([]);
-  const [session,setSession]=useState<Session|null>(()=>{
-    try { const raw=sessionStorage.getItem(SESSION_KEY); return raw?JSON.parse(raw) as Session:null; }catch {return null;}
-  });
+  const [session,setSession]=useState<ExamSession|null>(null);
+  const [sessionLoaded,setSessionLoaded]=useState(false);
+  const sessionWrites=useRef<Promise<void>>(Promise.resolve());
+  const completing=useRef(false);
   const [viewResult,setViewResult]=useState<Attempt|null>(null);
   const [selectedBank,setSelectedBank]=useState('');
   const [examSize,setExamSize]=useState(20);
@@ -35,8 +32,34 @@ export default function App() {
   const [now,setNow]=useState(Date.now());
 
   async function reload(){setBanks(await db.banks.toArray());setAttempts((await db.attempts.toArray()).sort((a,b)=>b.completedAt.localeCompare(a.completedAt)));}
-  useEffect(()=>{void reload();},[]);
-  useEffect(()=>{if(session)sessionStorage.setItem(SESSION_KEY,JSON.stringify(session));else sessionStorage.removeItem(SESSION_KEY);},[session]);
+  useEffect(()=>{void reload().catch(()=>setError('Local database cannot be opened. Check browser storage settings.'));},[]);
+  useEffect(()=>{
+    let mounted=true;
+    void db.activeSessions.get('current').then(saved=>{
+      if(!mounted)return;
+      if(saved?.value){setSession(saved.value);return;}
+      // One-time migration from v0.1 tab-only session storage.
+      try{
+        const previous=sessionStorage.getItem(SESSION_KEY);
+        if(previous){
+          const candidate:unknown=JSON.parse(previous);
+          if(candidate&&typeof candidate==='object'&&'id' in candidate&&'bank' in candidate&&'questions' in candidate&&'endsAt' in candidate){
+            const value=candidate as ExamSession;
+            if(typeof value.id==='string'&&typeof value.endsAt==='number'&&Array.isArray(value.questions)&&validateBank(value.bank).errors.length===0)setSession(value);
+          }
+        }
+      }catch{/* Discard invalid legacy session data. */}
+    }).catch(()=>{if(mounted)setError('Unable to restore an unfinished exam from IndexedDB.');}).finally(()=>{if(mounted){setSessionLoaded(true);sessionStorage.removeItem(SESSION_KEY);}});
+    return ()=>{mounted=false;};
+  },[]);
+  useEffect(()=>{
+    if(!sessionLoaded)return;
+    const current=session;
+    sessionWrites.current=sessionWrites.current.then(async()=>{
+      if(current)await db.activeSessions.put({key:'current',value:current});
+      else await db.activeSessions.delete('current');
+    }).catch(()=>setError('Failed to autosave the exam session. Check browser storage.'));
+  },[session,sessionLoaded]);
   useEffect(()=>{if(!session)return;const t=window.setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(t);},[session]);
 
   const bank=banks.find(b=>b.bank_id===selectedBank)??banks[0];
@@ -44,15 +67,23 @@ export default function App() {
   const eligible=useMemo(()=>bank?.questions.filter(q=>domain==='ALL'||q.domain===domain)??[],[bank,domain]);
   const timeLeft=session ? Math.max(0,Math.ceil((session.endsAt-now)/1000)) : 0;
 
-  function completeExam(active:Session){
+  function completeExam(active:ExamSession){
+    if(completing.current)return;
+    completing.current=true;
     const correctCount=active.questions.filter(q=>isCorrect(q,active.answers[q.id]??[])).length;
     const record:Attempt={
       id:active.id, bankId:active.bank.bank_id,bankTitle:active.bank.title,certification:active.bank.certification,
       startedAt:active.startedAt,completedAt:new Date().toISOString(),durationSeconds:active.durationSeconds,
       answers:active.answers,questionSnapshots:active.questions,correctCount,total:active.questions.length
     };
-    setSession(null);setViewResult(record);setPage('exam');
-    void db.attempts.put(record).then(reload).catch(()=>setError('Results could not be saved. Export your data before closing this page.'));
+    // Persist the result and clear the active session in a single database transaction.
+    void sessionWrites.current.then(()=>db.transaction('rw',db.attempts,db.activeSessions,async()=>{
+      await db.attempts.put(record);
+      await db.activeSessions.delete('current');
+    })).then(async()=>{
+      setSession(null);setViewResult(record);setPage('exam');await reload();
+    }).catch(()=>setError('Exam submission could not be saved. Your unfinished exam is retained; retry after resolving storage access.'))
+      .finally(()=>{completing.current=false;});
   }
   useEffect(()=>{
     if(session && timeLeft<=0) completeExam(session);
