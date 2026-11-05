@@ -10,8 +10,9 @@ export default defineConfig({
   reporter:process.env.CI?'github':'list',
   use:{baseURL:'http://127.0.0.1:4173',trace:'retain-on-failure'},
   projects:[
-    {name:'chromium',use:{...devices['Desktop Chrome']}},
-    {name:'webkit',use:{...devices['Desktop Safari']}}
+    {name:'chromium',testIgnore:'**/mobile.spec.ts',use:{...devices['Desktop Chrome']}},
+    {name:'webkit',testIgnore:'**/mobile.spec.ts',use:{...devices['Desktop Safari']}},
+    {name:'mobile-webkit',testMatch:'**/mobile.spec.ts',use:{...devices['iPhone 13']}}
   ],
   webServer:{
     command:'npm run build && npm run preview -- --host 127.0.0.1 --port 4173 --strictPort',
