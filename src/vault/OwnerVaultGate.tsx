@@ -6,12 +6,17 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {ExperimentalVaultRepository,type OwnerVaultSession} from './storage';
 import {MAX_VAULT_TRANSFER_BYTES} from './transfer';
+import {SyntheticLegacySource} from './syntheticLegacy';
+import {rehearseSyntheticMigration,verifySyntheticMigrationCopy} from './migration';
 
 type VaultView='Manage Content'|'Exam Practice';
 export default function OwnerVaultGate({idleMs,lockOnHidden}:{
   idleMs?:number;lockOnHidden?:boolean
 }){
   const repository=useMemo(()=>new ExperimentalVaultRepository(),[]);
+  // This component is exclusively compiled into the localhost test harness.
+  // SyntheticLegacySource NEVER opens or imports the production exam database.
+  const legacy=useMemo(()=>new SyntheticLegacySource(),[]);
   const sessionRef=useRef<OwnerVaultSession|null>(null);
   const [phase,setPhase]=useState<'checking'|'setup'|'locked'|'unlocked'>('checking');
   const [master,setMaster]=useState('');
@@ -37,10 +42,11 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
       mounted=false;
       const session=sessionRef.current;
       sessionRef.current=null;
+      legacy.close();
       if(session)void session.lock().finally(()=>repository.close());
       else repository.close();
     };
-  },[repository]);
+  },[repository,legacy]);
 
   function clearPrivateState(){
     sessionRef.current=null;
@@ -163,6 +169,54 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
       setBusy(false);setRestoreFile(null);setRestoreSecret('');
     }
   }
+  async function seedSyntheticSource(){
+    if(busy)return;
+    setError('');setNotice('');setBusy(true);
+    try{
+      const created=await legacy.seedIfEmpty();
+      setNotice(created?
+        'Synthetic legacy source seeded with five record classes.':
+        'Synthetic source already exists; no records were replaced.');
+    }catch(error){report(error);}
+    finally{setBusy(false);}
+  }
+  async function rehearseMigration(interrupt:boolean){
+    if(busy)return;
+    setError('');setNotice('');setBusy(true);
+    try{
+      const session=sessionRef.current;
+      if(!session)throw new Error('Vault owner must unlock before migration rehearsal');
+      session.touch();
+      const result=await rehearseSyntheticMigration(
+        session,legacy,interrupt?{interruptAfterWriteBeforeCheckpoint:1}:{}
+      );
+      setNotice('Synthetic migration validated: '+result.records+
+        ' encrypted records; '+result.resumedRecords+' resumed, '+
+        result.copiedRecords+' newly copied. Source remains unchanged.');
+    }catch(error){report(error);}
+    finally{setBusy(false);}
+  }
+  async function verifyMigration(){
+    if(busy)return;
+    setError('');setNotice('');setBusy(true);
+    try{
+      const session=sessionRef.current;
+      if(!session)throw new Error('Unlock owner vault to validate migration');
+      session.touch();
+      const report=await verifySyntheticMigrationCopy(session);
+      setNotice('Verified '+report.records+' encrypted migration records against authenticated journal.');
+    }catch(error){report(error);}
+    finally{setBusy(false);}
+  }
+  async function changeSyntheticSource(){
+    if(busy)return;
+    setError('');setNotice('');setBusy(true);
+    try{
+      await legacy.modifySourceForTest();
+      setNotice('Synthetic-only source changed; resuming must now fail closed.');
+    }catch(error){report(error);}
+    finally{setBusy(false);}
+  }
   async function read(){
     setError('');setNotice('');setBusy(true);
     try{
@@ -251,6 +305,25 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
       <button disabled={busy} onClick={()=>void exportPortableBackup()}>
         Export encrypted vault transfer
       </button>
+      <section aria-label="Synthetic migration rehearsal">
+        <h3>Synthetic-only legacy migration rehearsal</h3>
+        <p>Source: examprep-synthetic-legacy-v1. Production examprep-v1 is never opened.</p>
+        <button disabled={busy} onClick={()=>void seedSyntheticSource()}>
+          Seed synthetic legacy source
+        </button>
+        <button disabled={busy} onClick={()=>void rehearseMigration(true)}>
+          Simulate migration interruption
+        </button>
+        <button disabled={busy} onClick={()=>void rehearseMigration(false)}>
+          Resume synthetic migration
+        </button>
+        <button disabled={busy} onClick={()=>void verifyMigration()}>
+          Verify encrypted migration copy
+        </button>
+        <button disabled={busy} onClick={()=>void changeSyntheticSource()}>
+          Mutate synthetic source for negative test
+        </button>
+      </section>
       <button disabled={busy||!savedRef} onClick={()=>void attemptStaleSave()}>
         Attempt stale encrypted write
       </button>
