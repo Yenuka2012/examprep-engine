@@ -11,6 +11,12 @@ jobs:
   browser-e2e-independent:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    # P0 #79: avoid slow Ubuntu apt mirrors during on-demand Playwright --with-deps.
+    # Official Playwright v1.64.1 image includes browser binaries and OS libraries;
+    # lock image digest to the exact reviewed Microsoft Artifact Registry build.
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f
+      options: --user 1001
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -21,8 +27,12 @@ jobs:
           package-manager-cache: false
       - name: Install locked dependencies
         run: npm ci --no-fund
-      - name: Install supported browsers and OS dependencies
-        run: npx playwright install --with-deps chromium webkit
+      - name: Verify version-matched preinstalled Playwright browsers
+        run: |
+          node --version
+          node -p "require('@playwright/test/package.json').version"
+          test "$(node -p \"require('@playwright/test/package.json').version\")" = '1.64.1'
+          test -d /ms-playwright
       - name: Run cross-browser exam regression
         run: npm run test:e2e
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
