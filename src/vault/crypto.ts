@@ -128,7 +128,7 @@ export async function createVault(masterSecret:string,recoverySecret:string):Pro
   const recovery=await wrapDEK(transientDEK,recoverySecret);
   // Runtime key is nonextractable and remains exclusively in memory.
   const key=await crypto.subtle.unwrapKey(
-    'raw',unb64(master.wrappedKey,64),
+    'raw',new Uint8Array(unb64(master.wrappedKey,64)),
     await deriveWrapKey(masterSecret,unb64(master.salt,16)),
     'AES-KW',{name:'AES-GCM',length:256},false,['encrypt','decrypt']
   );
@@ -140,7 +140,7 @@ export async function unlockVault(raw:unknown,secret:string,method:'master'|'rec
   const wrap=header[method];
   try{
     return await crypto.subtle.unwrapKey(
-      'raw',unb64(wrap.wrappedKey,64),
+      'raw',new Uint8Array(unb64(wrap.wrappedKey,64)),
       await deriveWrapKey(secret,unb64(wrap.salt,16)),
       'AES-KW',{name:'AES-GCM',length:256},false,['encrypt','decrypt']
     );
@@ -163,7 +163,7 @@ export async function encryptVaultRecord(
   const nonce=crypto.getRandomValues(new Uint8Array(12));
   const identity={format:recordFormat,vaultId:header.vaultId,recordId,recordType};
   const ciphertext=await crypto.subtle.encrypt(
-    {name:'AES-GCM',iv:new Uint8Array(nonce),additionalData:aad(identity),tagLength:128},
+    {name:'AES-GCM',iv:new Uint8Array(nonce),additionalData:new Uint8Array(aad(identity)),tagLength:128},
     key,plaintext
   );
   return {...identity,nonce:b64(nonce),ciphertext:b64(new Uint8Array(ciphertext))};
@@ -173,8 +173,8 @@ export async function decryptVaultRecord(rawHeader:unknown,key:CryptoKey,raw:unk
   if(header.vaultId!==record.vaultId)throw new Error('Encrypted record belongs to another vault');
   try{
     const plain=await crypto.subtle.decrypt({
-      name:'AES-GCM',iv:unb64(record.nonce,12),additionalData:aad(record),tagLength:128
-    },key,unb64(record.ciphertext,MAX_VAULT_RECORD_BYTES+16));
+      name:'AES-GCM',iv:new Uint8Array(unb64(record.nonce,12)),additionalData:new Uint8Array(aad(record)),tagLength:128
+    },key,new Uint8Array(unb64(record.ciphertext,MAX_VAULT_RECORD_BYTES+16)));
     if(plain.byteLength>MAX_VAULT_RECORD_BYTES)throw new Error('Record exceeds size limit');
     return JSON.parse(decoder.decode(plain)) as unknown;
   }catch{throw new Error('Record authentication failed or ciphertext is damaged');}
