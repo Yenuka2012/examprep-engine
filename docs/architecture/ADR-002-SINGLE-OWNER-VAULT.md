@@ -34,7 +34,7 @@ On `https://yenuka2012.github.io/examprep-engine/`, all other Pages applications
 4. **Workspace:** Display Manage Content and Exam Practice modes only after successful unwrap. Workspaces use the same vault and owner.
 5. **Lock:** Explicit Lock, inactivity and lifecycle timeouts flush safely persisted encrypted examination changes then discard key references and decrypted UI state; new operations require unlock. In-memory zeroization in JavaScript is best effort, not a hard guarantee.
 6. **Backup/recovery:** Export an authenticated encrypted, versioned portable backup of the entire logical vault; test restore to a fresh browser profile. Provide a separately generated recovery method, also protected with a distinct secret or printed recovery key, with clear one-time disclosure and loss warnings.
-7. **Mac/iPhone:** Each browser origin/profile/device has its own vault records. Without remote sync, encrypted export/restore is the ONLY supported transfer. Do not imply synchronized cross-device exam progress.
+7. **Mac/iPhone/iPad/iPad:** Each browser origin/profile/device has its own vault records. iPadOS Safari (browser and installed Home Screen PWA) must be tested independently from iPhone Safari; iPad portrait/landscape, split-view, touch, external keyboard, encrypted export/import, file picker, offline reopen, device suspension and storage eviction are first-class acceptance cases. Without remote sync, encrypted export/restore is the ONLY supported transfer. Do not imply synchronized cross-device exam progress.
 
 ## 4. Cryptographic architecture (review before implementation)
 
@@ -50,7 +50,7 @@ On `https://yenuka2012.github.io/examprep-engine/`, all other Pages applications
 
 ## 5. WebAuthn/passkey design boundary
 
-WebAuthn credentials without a server can provide an optional **PRF-backed encryption-key unlock** when authenticators and browsers support the `prf` extension. Verify actual `prf` output and user verification on macOS Safari/Firefox and iPhone Safari before offering enrollment; do not assume device-wide compatibility or silently fall back to a weaker method.
+WebAuthn credentials without a server can provide an optional **PRF-backed encryption-key unlock** when authenticators and browsers support the `prf` extension. Verify actual `prf` output and user verification on macOS Safari/Firefox and iPhone/iPad Safari before offering enrollment; do not assume device-wide compatibility or silently fall back to a weaker method.
 
 A client-only WebAuthn assertion **is not independently verified server authentication**, so a biometric/passkey prompt by itself is not an access-control boundary. The PRF must supply real cryptographic key material to unwrap the DEK; ordinary WebAuthn UI without such material is insufficient. Always preserve a separately tested strong-passphrase/recovery path.
 
@@ -58,7 +58,7 @@ A client-only WebAuthn assertion **is not independently verified server authenti
 
 - Locked state is the default on fresh load, refresh, tab restore and after inactivity; never load decrypted content until vault unlock succeeds.
 - No decrypted exam snapshots, full banks or key material in service-worker caches, localStorage or sessionStorage.
-- Default inactivity lock policy: initially 5 minutes; require testing for iPhone background suspension and Mac browser tab lifecycle. Evaluate `visibilitychange` and `pageshow` timestamp checks, not timers alone.
+- Default inactivity lock policy: initially 5 minutes; require testing for iPhone background suspension and Mac/iPad browser tab lifecycle. Evaluate `visibilitychange` and `pageshow` timestamp checks, not timers alone.
 - Before lock, queue and commit final encrypted exam state; on failure, visibly preserve the unlocked session or fail closed with an actionable backup/recovery path. Do not silently discard answers.
 - Cross-tab Web Locks for vault writes, active exam ownership and secure migration; when one tab locks, other tabs must revalidate state. A UI mode is not authorization.
 - Keep PWA update `skipWaiting=false`, block schema/key-format upgrade while a saved exam remains, and maintain a backward-compatible emergency reader. Avoid static rollback to v0.2.1 for Dexie v3 profiles.
@@ -74,7 +74,7 @@ A client-only WebAuthn assertion **is not independently verified server authenti
 5. Only after validated migration, explicit user approval and recovery backup verification, remove legacy plaintext IndexedDB records. Warn that clearing site data before completing migration can cause permanent loss.
 6. Document how to detect interrupted migrations, resume safely, handle duplicate IDs, roll forward with compatible schema, and never silently overwrite data.
 
-Because `github.io` is a public shared-origin namespace, migrating the existing production browser database must undergo physical Mac/iPhone verification on an **isolated staging origin**, with strictly synthetic data, before any production migration is offered.
+Because `github.io` is a public shared-origin namespace, migrating the existing production browser database must undergo physical Mac/iPhone/iPad/iPad verification on an **isolated staging origin**, with strictly synthetic data, before any production migration is offered.
 
 ## 8. Explicit exclusions
 
@@ -93,7 +93,7 @@ Because `github.io` is a public shared-origin namespace, migrating the existing 
 - Atomic crash/interrupted migration: recover without losing original data; mismatch blocks deletion.
 - Cross-tab lock contention, background auto-lock, reload after unlock, power interruption, failed autosave and browser storage eviction tests.
 - Locked application never exposes privileged UI data; all admin/practice operations require an active unlocked vault.
-- WebKit iPhone/macOS, Chromium and Firefox browser coverage; test with and without PRF availability.
+- WebKit iPhone/iPad/macOS, Chromium and Firefox browser coverage; iPadOS Safari (normal tab and Home Screen PWA) in portrait/landscape and split-view, touch/keyboard, vault lifecycle, backup/import and background lock tests; test with and without PRF availability.
 - Verify encrypted full-vault export and restore in a separate clean profile, including catalogs, completed attempts and active-exam policy.
 - Full npm audit, TypeScript/unit/E2E, CodeQL and protected Pages deployment unchanged; no weakened CSP or test skip.
 - No production merge or destructive storage migration without owner acceptance and tested recovery.
@@ -103,7 +103,7 @@ Because `github.io` is a public shared-origin namespace, migrating the existing 
 **M2-S1:** Approve this threat model and select final crypto KDF/host-origin policy.  
 **M2-S2:** Build vault envelope, KDF, storage repository adapters and adversarial unit tests.  
 **M2-S3:** Implement owner setup/unlock/lock screen and Manage Content/Exam Practice navigation.  
-**M2-S4:** Non-destructive migration, fresh-profile recovery, iPhone Safari and cross-tab tests.  
+**M2-S4:** Non-destructive migration, fresh-profile recovery, iPhone/iPad Safari and cross-tab tests.  
 **M2-S5:** Optional PRF-backed passkey unlock only where support is verified; release through protected CI.
 
 ## Sources
