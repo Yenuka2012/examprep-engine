@@ -65,7 +65,8 @@ function validateWrap(raw:unknown):WrappedVaultKey{
   if(unb64(raw.salt,16).byteLength!==16||unb64(raw.wrappedKey,64).byteLength!==40){
     throw new Error('Invalid vault key wrap');
   }
-  return raw as WrappedVaultKey;
+  return {kdf:'PBKDF2-SHA256',iterations:VAULT_KDF_ITERATIONS,
+    salt:raw.salt as string,wrappedKey:raw.wrappedKey as string};
 }
 export function validateVaultHeader(raw:unknown):VaultHeader{
   if(!obj(raw))throw new Error('Invalid vault header');
@@ -90,7 +91,9 @@ export function validateVaultRecord(raw:unknown):EncryptedVaultRecord{
   if(unb64(raw.ciphertext,MAX_VAULT_RECORD_BYTES+16).byteLength<17){
     throw new Error('Invalid record ciphertext');
   }
-  return raw as EncryptedVaultRecord;
+  return {format:recordFormat,vaultId:raw.vaultId as string,
+    recordId:raw.recordId as string,recordType:raw.recordType as VaultRecordType,
+    nonce:raw.nonce as string,ciphertext:raw.ciphertext as string};
 }
 function checkSecret(value:string,label:string){
   if(typeof value!=='string'||value.length<16||value.length>1024){
