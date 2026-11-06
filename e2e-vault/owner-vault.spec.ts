@@ -124,6 +124,9 @@ test('origin-wide lock denies second tab and permits resume after owner locks',a
   await expect(other.getByRole('heading',{name:'Unlock private vault'})).toBeVisible();
   await page.getByRole('button',{name:'Lock vault'}).click();
   await expect(page.getByRole('heading',{name:'Unlock private vault'})).toBeVisible();
+  // The failure path intentionally clears credentials; re-enter the owner
+  // secret rather than attempting a disabled button after the denied unlock.
+  await other.getByLabel('Credential').fill(MASTER);
   await other.getByRole('button',{name:'Unlock encrypted vault'}).click();
   await expect(other.getByRole('heading',{name:'Owner workspace'})).toBeVisible();
   await other.getByRole('button',{name:'Read encrypted test record'}).click();
