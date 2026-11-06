@@ -63,6 +63,10 @@ test('owner vault keeps IndexedDB ciphertext-only and restores from separate rec
   await expect(page.getByRole('heading',{name:'Owner workspace'})).toBeVisible();
   await page.getByRole('button',{name:'Read encrypted test record'}).click();
   await expect(page.getByTestId('decrypted-note')).toHaveText(MARKER);
+  await page.getByRole('button',{name:'Attempt stale encrypted write'}).click();
+  await expect(page.getByRole('alert')).toContainText('Stale encrypted record revision');
+  await page.getByRole('button',{name:'Read encrypted test record'}).click();
+  await expect(page.getByTestId('decrypted-note')).toHaveText(MARKER);
   await page.getByRole('button',{name:'Lock vault'}).click();
   await expect(page.getByText(MARKER)).toHaveCount(0);
 });
@@ -86,19 +90,19 @@ test('wrong credentials and corrupted ciphertext fail closed without plaintext f
     try{
       const tx=db.transaction('records','readwrite');
       const store=tx.objectStore('records');
-      const records=await new Promise<Array<{recordId:string;envelope:{
-        recordType:string;ciphertext:string
-      }}>>((resolve,reject)=>{
-        const get=store.getAll();
-        get.onsuccess=()=>resolve(get.result);
-        get.onerror=()=>reject(get.error);
-      });
-      const target=records.find(row=>row.envelope.recordType==='bank');
-      if(!target)throw new Error('Synthetic encrypted bank record missing');
-      const old=target.envelope.ciphertext;
-      target.envelope.ciphertext=(old[0]==='A'?'B':'A')+old.slice(1);
-      store.put(target);
       await new Promise<void>((resolve,reject)=>{
+        const request=store.getAll();
+        request.onerror=()=>reject(request.error);
+        request.onsuccess=()=>{
+          const records=request.result as Array<{recordId:string;envelope:{
+            recordType:string;ciphertext:string
+          }}>;
+          const target=records.find(row=>row.envelope.recordType==='bank');
+          if(!target){reject(new Error('Synthetic encrypted bank record missing'));return;}
+          const old=target.envelope.ciphertext;
+          target.envelope.ciphertext=(old[0]==='A'?'B':'A')+old.slice(1);
+          store.put(target);
+        };
         tx.oncomplete=()=>resolve();
         tx.onerror=()=>reject(tx.error);
         tx.onabort=()=>reject(tx.error);
