@@ -87,7 +87,10 @@ function validatedRows(snapshot:MockLegacySnapshot){
     if(!Array.isArray(rows))throw new Error('Synthetic migration source store is not an array');
     for(const raw of rows){
       if(!obj(raw))throw new Error('Synthetic migration contains malformed source record');
-      const id=name==='banks'?raw.bank_id:name==='activeSessions'?raw.key:raw.id;
+      // A discriminated store key does not narrow a union produced by dynamic
+      // indexed array iteration in strict TS7. Validate the opaque key first.
+      const fields=raw as unknown as Record<string,unknown>;
+      const id=name==='banks'?fields.bank_id:name==='activeSessions'?fields.key:fields.id;
       assertString(id,name+' key');
       const unique=name+'/'+id;
       if(seen.has(unique))throw new Error('Duplicate synthetic source identifier');
