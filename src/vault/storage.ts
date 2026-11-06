@@ -148,7 +148,10 @@ export class OwnerVaultSession {
     this.#lastActivity=Date.now();
   }
   private checkIdle(){
-    if(!this.#closing&&this.#key&&Date.now()-this.#lastActivity>=this.#idleMs){
+    // Do not leave decrypted UI visible if the browser unexpectedly revokes
+    // the owner Web Lock before the inactivity deadline.
+    if(!this.#closing&&this.#key&&
+       (!this.#lock.owned||Date.now()-this.#lastActivity>=this.#idleMs)){
       void this.lock();
     }
   }
