@@ -8,7 +8,8 @@ const decoder=new TextDecoder('utf-8',{fatal:true});
 export const VAULT_KDF_ITERATIONS=600_000 as const;
 export const MAX_VAULT_RECORD_BYTES=8*1024*1024;
 // key-check is reserved for a private authenticated DEK verifier, never user data.
-const RECORD_TYPES=['bank','attempt','active-session','certification','syllabus','key-check'] as const;
+// The migration journal is itself encrypted and never indexed as plaintext.
+const RECORD_TYPES=['bank','attempt','active-session','certification','syllabus','key-check','migration-journal'] as const;
 export type VaultRecordType=typeof RECORD_TYPES[number];
 export type WrappedVaultKey={
   kdf:'PBKDF2-SHA256';
