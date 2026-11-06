@@ -327,27 +327,43 @@ export class ExperimentalVaultRepository {
     if(options.expectedNonce!==undefined&&options.recordId===undefined){
       throw new Error('Update requires an explicit existing record ID');
     }
+    // Web Crypto's async decrypt must NOT run inside an IndexedDB transaction:
+    // native IDB may auto-commit before the crypto promise resolves on Safari.
+    const previous=await this.db.records.get(recordId);
+    let originalEnvelope:string|undefined;
+    if(previous){
+      if(previous.recordId!==recordId||!options.expectedNonce||
+         previous.envelope.nonce!==options.expectedNonce){
+        throw new Error('Stale encrypted record revision; prior data preserved');
+      }
+      const verified=validateVaultRecord(previous.envelope);
+      if(verified.recordId!==recordId||verified.recordType!==type){
+        throw new Error('Encrypted record identity or type changed');
+      }
+      await decryptVaultRecord(header,key,verified);
+      originalEnvelope=JSON.stringify(previous.envelope);
+    }else if(options.expectedNonce!==undefined){
+      throw new Error('Encrypted record missing; stale update rejected');
+    }
     const envelope=await encryptVaultRecord(header,key,type,value,recordId);
     if(!owned())throw new Error('Owner lock lost before encrypted transaction');
+    // The entire compare-and-swap + put stays in ONE short, IDB-only tx.
     await this.db.transaction('rw',this.db.headers,this.db.records,async()=>{
       if(!owned())throw new Error('Owner lock lost during encrypted transaction');
       const current=await this.db.headers.get('primary');
       if(!current||current.verifierId!==verifierId||
-         validateVaultHeader(current.value).vaultId!==header.vaultId){
-        throw new Error('Vault identity changed during encrypted write');
+         JSON.stringify(validateVaultHeader(current.value))!==JSON.stringify(header)){
+        throw new Error('Vault header changed during encrypted write');
       }
-      const old=await this.db.records.get(recordId);
-      if(old){
-        if(!options.expectedNonce||old.envelope.nonce!==options.expectedNonce){
+      const live=await this.db.records.get(recordId);
+      if(previous){
+        if(!live||live.recordId!==recordId||
+           live.envelope.nonce!==options.expectedNonce||
+           JSON.stringify(live.envelope)!==originalEnvelope){
           throw new Error('Stale encrypted record revision; prior data preserved');
         }
-        const validated=validateVaultRecord(old.envelope);
-        if(validated.recordType!==type)throw new Error('Existing record type cannot change');
-        // Ensure the prior ciphertext genuinely belongs to this key, not
-        // merely a matching untrusted plaintext nonce or header value.
-        await decryptVaultRecord(header,key,validated);
-      }else if(options.expectedNonce!==undefined){
-        throw new Error('Encrypted record missing; stale update rejected');
+      }else if(live){
+        throw new Error('Encrypted record already exists; create-only write rejected');
       }
       await this.db.records.put({recordId,envelope});
     });
