@@ -138,7 +138,7 @@ function validatedRows(snapshot:MockLegacySnapshot){
   return parsed.sort((a,b)=>
     (a.recordType+'/'+a.sourceKey).localeCompare(b.recordType+'/'+b.sourceKey,'en'));
 }
-async function fingerprintSource(snapshot:MockLegacySnapshot){
+export async function fingerprintSyntheticSnapshot(snapshot:MockLegacySnapshot){
   const rows=validatedRows(snapshot);
   const items:SourceItem[]=await Promise.all(rows.map(async item=>({
     recordType:item.recordType,
@@ -223,7 +223,7 @@ export async function rehearseSyntheticMigration(
 ):Promise<MigrationResult>{
   if(!session.active)throw new Error('Unlock the experimental vault first');
   const sourceSnapshot=await source.snapshot();
-  const {items,fingerprint}=await fingerprintSource(sourceSnapshot);
+  const {items,fingerprint}=await fingerprintSyntheticSnapshot(sourceSnapshot);
   const journalRows=await session.listByType('migration-journal');
   if(journalRows.length>1)throw new Error('Multiple encrypted migration journals: refuse to proceed');
   let journal:MigrationJournal;
@@ -281,7 +281,7 @@ export async function rehearseSyntheticMigration(
   for(let i=0;i<items.length;i++){
     await validatePayload(await session.read(journal.entries[i].recordId),items[i]);
   }
-  const repeat=await fingerprintSource(await source.snapshot());
+  const repeat=await fingerprintSyntheticSnapshot(await source.snapshot());
   if(repeat.fingerprint!==fingerprint){
     throw new Error('Synthetic source changed during copy: migration not validated');
   }
