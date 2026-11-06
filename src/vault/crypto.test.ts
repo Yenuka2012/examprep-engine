@@ -72,7 +72,8 @@ describe('M2.2 isolated encrypted vault cryptographic core',()=>{
     const record=await encryptVaultRecord(header,key,'bank','hello');
     expect(()=>validateVaultRecord({...record,nonce:'AAAA'})).toThrow();
     expect(()=>validateVaultRecord({...record,extra:'future'})).toThrow(/fields/);
-    const damaged={...header,master:{...header.master,wrappedKey:header.recovery.wrappedKey}};
+    const damaged={...header,master:{...header.master,wrappedKey:
+      (header.master.wrappedKey[0]==='A'?'B':'A')+header.master.wrappedKey.slice(1)}};
     await expect(unlockVault(damaged,master)).rejects.toThrow(/unlock failed/);
   });
   it('bounds plaintext and rejects unsupported JSON payloads',async()=>{
