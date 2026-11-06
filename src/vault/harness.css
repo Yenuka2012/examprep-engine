@@ -1,0 +1,14 @@
+*{box-sizing:border-box}
+body{font:16px/1.5 system-ui,-apple-system,sans-serif;margin:0;background:#101927;color:#e8eef8}
+.vault-harness{width:min(740px,100%);padding:24px;margin:20px auto}
+.vault-harness section{background:#1c293c;border:1px solid #415171;border-radius:12px;padding:20px}
+.vault-harness label{display:block;margin:10px 0}
+.vault-harness input,.vault-harness textarea,.vault-harness select{
+ display:block;width:100%;font:inherit;padding:10px;margin-top:4px;border-radius:7px;
+ border:1px solid #687fa3;background:#f7fbff;color:#101927
+}
+.vault-harness button{border:0;border-radius:7px;padding:11px 14px;margin:5px 7px 6px 0;
+ background:#c2e0ff;color:#101927;cursor:pointer}
+.vault-harness button:disabled{opacity:.55;cursor:not-allowed}
+.vault-harness [role=alert]{color:#ffacac}
+.vault-harness [role=status]{overflow-wrap:anywhere}
