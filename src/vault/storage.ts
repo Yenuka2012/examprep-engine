@@ -21,6 +21,11 @@ type EncryptedRow={recordId:string;envelope:EncryptedVaultRecord};
 type KeyCheck={purpose:typeof KEY_CHECK_PURPOSE;vaultId:string;challenge:string};
 export type VaultRecordRead={recordId:string;recordType:VaultRecordType;nonce:string;value:unknown};
 export type VaultRecordSaved={recordId:string;nonce:string};
+type SessionIO={
+  read:(key:CryptoKey,recordId:string,owned:()=>boolean)=>Promise<VaultRecordRead|undefined>;
+  write:(key:CryptoKey,type:Exclude<VaultRecordType,'key-check'>,value:unknown,
+    options:{recordId?:string;expectedNonce?:string},owned:()=>boolean)=>Promise<VaultRecordSaved>;
+};
 export type OwnerSessionOptions={
   idleMs?:number;
   onLocked?:()=>void;
@@ -104,7 +109,7 @@ export class OwnerVaultSession {
   #timer:ReturnType<typeof setInterval>|null=null;
   #pending=new Set<Promise<unknown>>();
   #lock:OwnerVaultLock;
-  #repo:ExperimentalVaultRepository;
+  #io:SessionIO;
   #idleMs:number;
   #onLocked:(()=>void)|undefined;
   #lockOnHidden:boolean;
@@ -115,8 +120,8 @@ export class OwnerVaultSession {
   #pagehide=()=>{void this.lock();};
   #pageshow=()=>{this.checkIdle();};
 
-  constructor(repo:ExperimentalVaultRepository,key:CryptoKey,lock:OwnerVaultLock,options:OwnerSessionOptions={}){
-    this.#repo=repo;
+  constructor(io:SessionIO,key:CryptoKey,lock:OwnerVaultLock,options:OwnerSessionOptions={}){
+    this.#io=io;
     this.#key=key;
     this.#lock=lock;
     this.#idleMs=options.idleMs??DEFAULT_IDLE_MS;
@@ -165,7 +170,7 @@ export class OwnerVaultSession {
   read(recordId:string):Promise<VaultRecordRead|undefined>{
     this.#assertOpen();
     const key=this.#key!;
-    return this.#track(this.#repo.readEncrypted(key,recordId,()=>this.#lock.owned));
+    return this.#track(this.#io.read(key,recordId,()=>this.#lock.owned));
   }
   /**
    * Revision token is the previous authenticated nonce. Existing records
@@ -177,7 +182,7 @@ export class OwnerVaultSession {
   }={}):Promise<VaultRecordSaved>{
     this.#assertOpen();
     const key=this.#key!;
-    return this.#track(this.#repo.writeEncrypted(
+    return this.#track(this.#io.write(
       key,type,value,options,()=>this.#lock.owned
     ));
   }
@@ -240,7 +245,7 @@ export class ExperimentalVaultRepository {
         await this.db.headers.add({id:'primary',value:header,verifierId});
         await this.db.records.add({recordId:verifierId,envelope:verifier});
       });
-      session=new OwnerVaultSession(this,key,lock,options);
+      session=new OwnerVaultSession(this.sessionIO(),key,lock,options);
       return session;
     }catch(error){
       if(!session)await lock.release();
@@ -276,6 +281,12 @@ export class ExperimentalVaultRepository {
       throw error;
     }
   }
+  private sessionIO():SessionIO{
+    return {
+      read:(key,id,owned)=>this.readEncrypted(key,id,owned),
+      write:(key,type,value,options,owned)=>this.writeEncrypted(key,type,value,options,owned)
+    };
+  }
   private async acquireOwnerLock(){
     const lock=new OwnerVaultLock();
     if(!lock.supported)throw new Error('Vault requires browser Web Locks for exclusive owner access');
@@ -290,7 +301,7 @@ export class ExperimentalVaultRepository {
     return {header,verifierId:row.verifierId};
   }
   // Invoked only from OwnerVaultSession. No public key-based user API.
-  async readEncrypted(
+  private async readEncrypted(
     key:CryptoKey,recordId:string,owned:()=>boolean
   ):Promise<VaultRecordRead|undefined>{
     if(!owned())throw new Error('Owner lock lost before encrypted read');
@@ -304,7 +315,7 @@ export class ExperimentalVaultRepository {
     if(row.envelope.recordType==='key-check')throw new Error('Internal verifier is not user data');
     return {recordId,recordType:row.envelope.recordType,nonce:row.envelope.nonce,value};
   }
-  async writeEncrypted(
+  private async writeEncrypted(
     key:CryptoKey,type:Exclude<VaultRecordType,'key-check'>,value:unknown,
     options:{recordId?:string;expectedNonce?:string},owned:()=>boolean
   ):Promise<VaultRecordSaved>{
