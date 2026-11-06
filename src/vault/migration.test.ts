@@ -19,17 +19,10 @@ describe('synthetic migration preflight and canonical source fingerprint',()=>{
     const a=syntheticLegacyFixture();
     const old=await fingerprintSyntheticSnapshot(a);
     const reordered=structuredClone(a);
-    reordered.banks[0]=JSON.parse(JSON.stringify(reordered.banks[0],
-      Object.keys(reordered.banks[0]).reverse())) as typeof reordered.banks[0];
-    // Rebuilding a nested object with a fresh key order must not affect hash.
-    reordered.banks[0]={
-      questions:reordered.banks[0].questions,
-      certification:reordered.banks[0].certification,
-      title:reordered.banks[0].title,
-      bank_id:reordered.banks[0].bank_id,
-      schema_version:reordered.banks[0].schema_version,
-      syllabus_version:reordered.banks[0].syllabus_version
-    };
+    // Reverse top-level object key insertion order, not the payload.
+    reordered.banks[0]=Object.fromEntries(
+      Object.entries(reordered.banks[0]).reverse()
+    ) as typeof reordered.banks[0];
     const fresh=await fingerprintSyntheticSnapshot(reordered);
     expect(fresh.fingerprint).toBe(old.fingerprint);
   });
@@ -59,7 +52,9 @@ describe('synthetic migration preflight and canonical source fingerprint',()=>{
     delete (s as unknown as Record<string,unknown>).attempts;
     await expect(fingerprintSyntheticSnapshot(s)).rejects.toThrow();
     const t=syntheticLegacyFixture();
-    t.activeSessions[0].value.bank.bank_id='NO-BANK';
+    t.activeSessions[0].value.bank={
+      ...t.activeSessions[0].value.bank,bank_id:'NO-BANK'
+    };
     await expect(fingerprintSyntheticSnapshot(t)).rejects.toThrow(/active session/);
   });
 });
