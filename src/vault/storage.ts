@@ -274,7 +274,7 @@ export class ExperimentalVaultRepository {
          typeof checked.challenge!=='string'||checked.challenge.length<10){
         throw new Error('Vault key verification failed');
       }
-      session=new OwnerVaultSession(this,key,lock,options);
+      session=new OwnerVaultSession(this.sessionIO(),key,lock,options);
       return session;
     }catch(error){
       if(!session)await lock.release();
@@ -320,7 +320,6 @@ export class ExperimentalVaultRepository {
     options:{recordId?:string;expectedNonce?:string},owned:()=>boolean
   ):Promise<VaultRecordSaved>{
     if(!owned())throw new Error('Owner lock lost before encrypted write');
-    if(type==='key-check')throw new Error('Reserved vault record class');
     const {header,verifierId}=await this.readHeader();
     const recordId=options.recordId??crypto.randomUUID();
     if(recordId===verifierId)throw new Error('Reserved vault verifier identifier');
