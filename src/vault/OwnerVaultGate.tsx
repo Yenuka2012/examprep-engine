@@ -99,6 +99,19 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
     }catch(error){report(error);}
     finally{setBusy(false);}
   }
+  async function attemptStaleSave(){
+    setError('');setNotice('');setBusy(true);
+    try{
+      const session=sessionRef.current;
+      if(!session||!savedRef)throw new Error('Read an existing synthetic record first');
+      session.touch();
+      await session.save('bank',{kind:'synthetic-private-note',text:'stale-write-must-not-commit'},{
+        recordId:savedRef.recordId,expectedNonce:'synthetic-stale-nonce'
+      });
+      setError('Stale write was unexpectedly accepted');
+    }catch(error){report(error);}
+    finally{setBusy(false);}
+  }
   async function read(){
     setError('');setNotice('');setBusy(true);
     try{
@@ -168,6 +181,9 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
         }} /></label>
       <button disabled={busy} onClick={()=>void save()}>Save encrypted test record</button>
       <button disabled={busy} onClick={()=>void read()}>Read encrypted test record</button>
+      <button disabled={busy||!savedRef} onClick={()=>void attemptStaleSave()}>
+        Attempt stale encrypted write
+      </button>
       {visibleNote&&<p data-testid="decrypted-note">{visibleNote}</p>}
       <button disabled={busy} onClick={()=>void lock()}>Lock vault</button>
     </section>}
