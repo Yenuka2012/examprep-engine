@@ -18,7 +18,10 @@
     "generate:validator": "node scripts/generate-validator.mjs",
     "prebuild": "npm run generate:validator",
     "pretest": "npm run generate:validator",
-    "pretypecheck": "npm run generate:validator"
+    "pretypecheck": "npm run generate:validator",
+    "build:pages": "npm run build",
+    "build:ubuntu": "npm run generate:validator && vite build --mode ubuntu",
+    "verify:hosting": "node scripts/verify-hosting-builds.mjs"
   },
   "dependencies": {
     "ajv": "8.20.0",

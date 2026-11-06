@@ -39,6 +39,10 @@ jobs:
         run: npm test
       - name: Production build
         run: npm run build
+      - name: Ubuntu static hosting build (no deployment)
+        run: npm run build:ubuntu
+      - name: Validate Pages and Ubuntu base URLs and PWA assets
+        run: npm run verify:hosting
       - name: Generate CycloneDX dependency inventory
         run: npm sbom --sbom-format cyclonedx > sbom.cdx.json
       - name: Hash production assets
