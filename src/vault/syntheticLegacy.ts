@@ -33,7 +33,7 @@ class MockLegacyDb extends Dexie{
   }
 }
 const DATE='2026-01-01T00:00:00.000Z';
-function syntheticData():MockLegacySnapshot{
+export function syntheticLegacyFixture():MockLegacySnapshot{
   const certification:CertificationProfile={
     id:'SYNTH-CISM',name:'Synthetic CISM certification',provider:'TEST-ONLY',createdAt:DATE
   };
@@ -82,7 +82,7 @@ export class SyntheticLegacySource{
           this.db.certifications.count(),this.db.syllabusVersions.count()
         ]);
         if(counts.some(n=>n>0))return false;
-        const fixture=syntheticData();
+        const fixture=syntheticLegacyFixture();
         await this.db.banks.bulkAdd(fixture.banks);
         await this.db.attempts.bulkAdd(fixture.attempts);
         await this.db.activeSessions.bulkAdd(fixture.activeSessions);
