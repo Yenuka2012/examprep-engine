@@ -5,6 +5,7 @@
  */
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {ExperimentalVaultRepository,type OwnerVaultSession} from './storage';
+import {MAX_VAULT_TRANSFER_BYTES} from './transfer';
 
 type VaultView='Manage Content'|'Exam Practice';
 export default function OwnerVaultGate({idleMs,lockOnHidden}:{
@@ -15,6 +16,9 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
   const [phase,setPhase]=useState<'checking'|'setup'|'locked'|'unlocked'>('checking');
   const [master,setMaster]=useState('');
   const [recovery,setRecovery]=useState('');
+  const [restoreFile,setRestoreFile]=useState<File|null>(null);
+  const [restoreSecret,setRestoreSecret]=useState('');
+  const [restoreMethod,setRestoreMethod]=useState<'master'|'recovery'>('master');
   const [unlockMethod,setUnlockMethod]=useState<'master'|'recovery'>('master');
   const [workspace,setWorkspace]=useState<VaultView>('Manage Content');
   const [privateNote,setPrivateNote]=useState('');
@@ -112,6 +116,53 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
     }catch(error){report(error);}
     finally{setBusy(false);}
   }
+  async function exportPortableBackup(){
+    if(busy)return;
+    setError('');setNotice('');setBusy(true);
+    try{
+      const session=sessionRef.current;
+      if(!session)throw new Error('Unlock owner vault before exporting');
+      session.touch();
+      const bundle=await session.exportBundle();
+      const content=JSON.stringify(bundle);
+      const file=new Blob([content],{type:'application/json'});
+      if(file.size>MAX_VAULT_TRANSFER_BYTES){
+        throw new Error('Encrypted-vault backup exceeds the 64 MiB limit');
+      }
+      const url=URL.createObjectURL(file);
+      try{
+        const anchor=document.createElement('a');
+        anchor.href=url;
+        anchor.download='examprep-vault-ENCRYPTED-'+new Date().toISOString().slice(0,10)+'.json';
+        document.body.appendChild(anchor);
+        anchor.click();anchor.remove();
+      }finally{
+        // Immediate revocation can abort Safari's asynchronous file download.
+        window.setTimeout(()=>URL.revokeObjectURL(url),10_000);
+      }
+      setNotice('Encrypted vault transfer prepared. Restore in a clean profile to verify recovery.');
+    }catch(error){report(error);}
+    finally{setBusy(false);}
+  }
+  async function importIntoEmptyVault(){
+    if(busy)return;
+    setError('');setNotice('');setBusy(true);
+    try{
+      const file=restoreFile;
+      if(!file||!restoreSecret)throw new Error('Select an encrypted vault transfer and credential');
+      if(file.size<1||file.size>MAX_VAULT_TRANSFER_BYTES){
+        throw new Error('Encrypted vault transfer must be 1 byte–64 MiB');
+      }
+      const raw:unknown=JSON.parse(await file.text());
+      const session=await repository.restoreEmpty(raw,restoreSecret,restoreMethod,sessionOptions());
+      sessionRef.current=session;
+      setPhase('unlocked');
+      setNotice('Authenticated encrypted vault recovered into an empty browser profile.');
+    }catch(error){report(error);}
+    finally{
+      setBusy(false);setRestoreFile(null);setRestoreSecret('');
+    }
+  }
   async function read(){
     setError('');setNotice('');setBusy(true);
     try{
@@ -151,6 +202,22 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
       <button disabled={busy||master.length<16||recovery.length<16} onClick={()=>void enroll()}>
         Enroll encrypted vault
       </button>
+      <hr />
+      <h3>Recover an encrypted vault in this empty browser profile</h3>
+      <p>Only the experimental ciphertext-only transfer format is accepted.
+        Existing vaults are never replaced, merged or cleared.</p>
+      <label>Encrypted transfer file <input aria-label="Encrypted vault transfer file" type="file"
+        accept=".json,application/json" onChange={event=>setRestoreFile(event.target.files?.[0]??null)} /></label>
+      <label>Restore method <select aria-label="Restore method" value={restoreMethod}
+        onChange={event=>setRestoreMethod(event.target.value as 'master'|'recovery')}>
+        <option value="master">Master passphrase</option>
+        <option value="recovery">Recovery credential</option>
+      </select></label>
+      <label>Restore credential <input aria-label="Restore credential" type="password"
+        autoComplete="off" value={restoreSecret} onChange={event=>setRestoreSecret(event.target.value)} /></label>
+      <button disabled={busy||!restoreFile||!restoreSecret} onClick={()=>void importIntoEmptyVault()}>
+        Restore into empty vault
+      </button>
     </section>}
     {phase==='locked'&&<section aria-label="Unlock experimental vault">
       <h2>Unlock private vault</h2>
@@ -181,6 +248,9 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
         }} /></label>
       <button disabled={busy} onClick={()=>void save()}>Save encrypted test record</button>
       <button disabled={busy} onClick={()=>void read()}>Read encrypted test record</button>
+      <button disabled={busy} onClick={()=>void exportPortableBackup()}>
+        Export encrypted vault transfer
+      </button>
       <button disabled={busy||!savedRef} onClick={()=>void attemptStaleSave()}>
         Attempt stale encrypted write
       </button>
