@@ -39,6 +39,15 @@ jobs:
         run: npm test
       - name: Production build
         run: npm run build
+      - name: Assert experimental vault harness is absent from Pages assets
+        run: |
+          test ! -e dist/vault-harness.html
+          test ! -e dist-vault-test
+          test -f dist/index.html
+          if find dist -type f -iname '*harness*' | grep -q .; then
+            echo 'Synthetic vault harness must not ship in Pages artifacts' >&2
+            exit 1
+          fi
       - name: Generate CycloneDX dependency inventory
         run: npm sbom --sbom-format cyclonedx > sbom.cdx.json
       - name: Hash production assets
