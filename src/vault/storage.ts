@@ -26,6 +26,7 @@ type KeyCheck={purpose:typeof KEY_CHECK_PURPOSE;vaultId:string;challenge:string}
 export type VaultRecordRead={recordId:string;recordType:VaultRecordType;nonce:string;value:unknown};
 export type VaultRecordSaved={recordId:string;nonce:string};
 type SessionIO={
+  listByType:(key:CryptoKey,recordType:Exclude<VaultRecordType,'key-check'>,owned:()=>boolean)=>Promise<VaultRecordRead[]>;
   exportBundle:(key:CryptoKey,owned:()=>boolean)=>Promise<EncryptedVaultTransfer>;
   read:(key:CryptoKey,recordId:string,owned:()=>boolean)=>Promise<VaultRecordRead|undefined>;
   write:(key:CryptoKey,type:Exclude<VaultRecordType,'key-check'>,value:unknown,
@@ -181,6 +182,12 @@ export class OwnerVaultSession {
     const key=this.#key!;
     return this.#track(this.#io.read(key,recordId,()=>this.#lock.owned));
   }
+  /** Enumerate only a requested encrypted class under the authenticated session. */
+  listByType(recordType:Exclude<VaultRecordType,'key-check'>):Promise<VaultRecordRead[]>{
+    this.#assertOpen();
+    const key=this.#key!;
+    return this.#track(this.#io.listByType(key,recordType,()=>this.#lock.owned));
+  }
   /**
    * Revision token is the previous authenticated nonce. Existing records
    * MUST be updated with the token returned by read/save; absent token means
@@ -308,6 +315,7 @@ export class ExperimentalVaultRepository {
   }
   private sessionIO():SessionIO{
     return {
+      listByType:(key,type,owned)=>this.listEncryptedType(key,type,owned),
       exportBundle:(key,owned)=>this.exportEncrypted(key,owned),
       read:(key,id,owned)=>this.readEncrypted(key,id,owned),
       write:(key,type,value,options,owned)=>this.writeEncrypted(key,type,value,options,owned)
@@ -373,6 +381,27 @@ export class ExperimentalVaultRepository {
     return {header,verifierId:row.verifierId};
   }
   // Invoked only from OwnerVaultSession. No public key-based user API.
+  private async listEncryptedType(
+    key:CryptoKey,recordType:Exclude<VaultRecordType,'key-check'>,owned:()=>boolean
+  ):Promise<VaultRecordRead[]>{
+    if(!owned())throw new Error('Owner lock lost before encrypted listing');
+    const {header}=await this.readHeader();
+    const rows=await this.db.records.toArray();
+    const listed:VaultRecordRead[]=[];
+    for(const row of rows){
+      if(!owned())throw new Error('Owner lock lost during encrypted listing');
+      if(row.recordId!==row.envelope.recordId){
+        throw new Error('Encrypted record identity mismatch');
+      }
+      const envelope=validateVaultRecord(row.envelope);
+      if(envelope.recordType!==recordType)continue;
+      const value=await decryptVaultRecord(header,key,envelope);
+      listed.push({
+        recordId:row.recordId,recordType,nonce:envelope.nonce,value
+      });
+    }
+    return listed;
+  }
   private async readEncrypted(
     key:CryptoKey,recordId:string,owned:()=>boolean
   ):Promise<VaultRecordRead|undefined>{
