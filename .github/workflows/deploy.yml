@@ -83,7 +83,7 @@ jobs:
         run: |
           node --version
           node -p "require('@playwright/test/package.json').version"
-          test "$(node -p \"require('@playwright/test/package.json').version\")" = '1.64.1'
+          node -e "if (require('@playwright/test/package.json').version !== '1.64.1') process.exit(1)"
           test -d /ms-playwright
       - name: Test production build in desktop and mobile browsers
         run: npm run test:e2e
