@@ -5,7 +5,7 @@ import {decryptBackup,isEncryptedBackup} from './crypto';
 import {validateBackupData,type ExamBackup} from './backup';
 
 export type BackupKind='encrypted'|'legacy-plaintext';
-export type RestoreResult={kind:BackupKind;banksAdded:number;attemptsAdded:number};
+export type RestoreResult={kind:BackupKind;banksAdded:number;attemptsAdded:number;certificationsAdded:number;syllabiAdded:number};
 
 const record=(value:unknown):value is Record<string,unknown> =>
   typeof value==='object'&&value!==null&&!Array.isArray(value);
@@ -20,11 +20,16 @@ export async function decodeBackup(raw:unknown,passphrase:string):Promise<{kind:
     return {kind:'encrypted',data:validateBackupData(await decryptBackup(raw,passphrase))};
   }
   if(record(raw)&&raw.backup_version===1){
-    // The v0.1 exporter wrote plaintext JSON in precisely this format.
-    // Never write recovered plaintext back to disk automatically.
+    // Legacy plaintext is permitted only for logical v1, with UI warning.
+    // The validator rejects v1 payloads that carry v2-only catalog fields.
     return {kind:'legacy-plaintext',data:validateBackupData(raw)};
   }
-  throw new Error('Unrecognized backup. Expected an encrypted v0.2 or legacy v0.1 JSON export');
+  if(record(raw)&&raw.backup_version===2){
+    // v2 catalog data MUST be encrypted before it is exported or restored.
+    // This prevents introducing a new accidental plaintext backup path.
+    throw new Error('Version 2 catalog backups must be encrypted');
+  }
+  throw new Error('Unrecognized backup. Expected encrypted v1/v2 or legacy plaintext v1 JSON export');
 }
 
 /**
@@ -41,12 +46,14 @@ export async function restoreBackup(data:ExamBackup):Promise<Omit<RestoreResult,
   if(!lock.supported)throw new Error('Secure restore unavailable: browser Web Locks API is required');
   if(!await lock.acquire())throw new Error('Another tab is using the examination database. Close the exam tab and retry.');
   try {
-    return await db.transaction('rw',db.banks,db.attempts,db.activeSessions,async()=>{
+    return await db.transaction('rw',db.banks,db.attempts,db.activeSessions,db.certifications,db.syllabusVersions,async()=>{
       if(await db.activeSessions.get('current')){
         throw new Error('Finish the active examination before restoring a backup.');
       }
       const newBanks:typeof validated.banks=[];
       const newAttempts:typeof validated.attempts=[];
+      const newCertifications=[...(validated.certifications??[])];
+      const newSyllabi=[...(validated.syllabi??[])];
       for(const bank of validated.banks){
         const present=await db.banks.get(bank.bank_id);
         if(present){
@@ -59,9 +66,29 @@ export async function restoreBackup(data:ExamBackup):Promise<Omit<RestoreResult,
           if(!jsonEqual(present,attempt))throw new Error('Attempt ID conflict: '+attempt.id+'. No data restored.');
         }else newAttempts.push(attempt);
       }
+      // Reject conflicting catalog IDs atomically and preserve existing profiles.
+      for(let i=newCertifications.length-1;i>=0;i--){
+        const candidate=newCertifications[i];
+        const old=await db.certifications.get(candidate.id);
+        if(old){
+          if(!jsonEqual(old,candidate))throw new Error('Certification ID conflict: '+candidate.id+'. No data restored.');
+          newCertifications.splice(i,1);
+        }
+      }
+      for(let i=newSyllabi.length-1;i>=0;i--){
+        const candidate=newSyllabi[i];
+        const old=await db.syllabusVersions.get(candidate.id);
+        if(old){
+          if(!jsonEqual(old,candidate))throw new Error('Syllabus ID conflict: '+candidate.id+'. No data restored.');
+          newSyllabi.splice(i,1);
+        }
+      }
       if(newBanks.length)await db.banks.bulkAdd(newBanks);
       if(newAttempts.length)await db.attempts.bulkAdd(newAttempts);
-      return {banksAdded:newBanks.length,attemptsAdded:newAttempts.length};
+      if(newCertifications.length)await db.certifications.bulkAdd(newCertifications);
+      if(newSyllabi.length)await db.syllabusVersions.bulkAdd(newSyllabi);
+      return {banksAdded:newBanks.length,attemptsAdded:newAttempts.length,
+        certificationsAdded:newCertifications.length,syllabiAdded:newSyllabi.length};
     });
   }finally{
     await lock.release();
