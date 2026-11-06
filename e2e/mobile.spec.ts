@@ -47,14 +47,9 @@ test('iPad WebKit portrait and landscape touch navigation stays within viewport'
   };
   await assertNoHorizontalOverflow();
   await page.getByRole('button',{name:'Question Banks',exact:true}).tap();
-  await expect(page.getByText('Import a question bank').first()).toBeVisible().catch(async()=>{
-    await expect(page.locator('input[type="file"]').first()).toBeAttached();
-  });
+  await expect(page.locator('input[type="file"]').first()).toBeAttached();
   await page.setViewportSize({width:1194,height:834});
   await assertNoHorizontalOverflow();
-  await page.getByRole('button',{name:'Certification Catalog',exact:true}).count().then(async count=>{
-    if(count)await page.getByRole('button',{name:'Certification Catalog',exact:true}).tap();
-    else await page.getByRole('button',{name:'Certifications',exact:true}).first().tap();
-  });
+  await page.getByRole('button',{name:'Certifications',exact:true}).tap();
   await expect(page.getByRole('heading',{name:'Certification catalog'})).toBeVisible();
 });
