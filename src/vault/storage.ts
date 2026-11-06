@@ -11,6 +11,10 @@ import {
   validateVaultHeader,validateVaultRecord,
   type VaultHeader,type EncryptedVaultRecord,type VaultRecordType
 } from './crypto';
+import {
+  createEncryptedVaultTransfer,verifyEncryptedVaultTransfer,
+  type EncryptedVaultTransfer
+} from './transfer';
 
 const DATABASE_NAME='examprep-secure-vault-v1';
 const OWNER_LOCK_NAME='examprep-secure-vault-v1-owner';
@@ -22,6 +26,7 @@ type KeyCheck={purpose:typeof KEY_CHECK_PURPOSE;vaultId:string;challenge:string}
 export type VaultRecordRead={recordId:string;recordType:VaultRecordType;nonce:string;value:unknown};
 export type VaultRecordSaved={recordId:string;nonce:string};
 type SessionIO={
+  exportBundle:(key:CryptoKey,owned:()=>boolean)=>Promise<EncryptedVaultTransfer>;
   read:(key:CryptoKey,recordId:string,owned:()=>boolean)=>Promise<VaultRecordRead|undefined>;
   write:(key:CryptoKey,type:Exclude<VaultRecordType,'key-check'>,value:unknown,
     options:{recordId?:string;expectedNonce?:string},owned:()=>boolean)=>Promise<VaultRecordSaved>;
@@ -108,6 +113,7 @@ export class OwnerVaultSession {
   #lastActivity=Date.now();
   #timer:ReturnType<typeof setInterval>|null=null;
   #pending=new Set<Promise<unknown>>();
+  #exporting=false;
   #lock:OwnerVaultLock;
   #io:SessionIO;
   #idleMs:number;
@@ -184,10 +190,26 @@ export class OwnerVaultSession {
     recordId?:string;expectedNonce?:string
   }={}):Promise<VaultRecordSaved>{
     this.#assertOpen();
+    if(this.#exporting)throw new Error('Vault backup in progress: encrypted writes are deferred');
     const key=this.#key!;
     return this.#track(this.#io.write(
       key,type,value,options,()=>this.#lock.owned
     ));
+  }
+  /** Export an authenticated ciphertext-only snapshot without allowing writes
+   * to race the snapshot; failed pending saves abort the entire export. */
+  async exportBundle():Promise<EncryptedVaultTransfer>{
+    this.#assertOpen();
+    if(this.#exporting)throw new Error('A vault backup is already in progress');
+    this.#exporting=true;
+    try{
+      await Promise.all([...this.#pending]);
+      this.#assertOpen();
+      const key=this.#key!;
+      return await this.#track(this.#io.exportBundle(key,()=>this.#lock.owned));
+    }finally{
+      this.#exporting=false;
+    }
   }
   /**
    * Stop new operations; allow already accepted writes to finish before
@@ -286,9 +308,56 @@ export class ExperimentalVaultRepository {
   }
   private sessionIO():SessionIO{
     return {
+      exportBundle:(key,owned)=>this.exportEncrypted(key,owned),
       read:(key,id,owned)=>this.readEncrypted(key,id,owned),
       write:(key,type,value,options,owned)=>this.writeEncrypted(key,type,value,options,owned)
     };
+  }
+  /** Restore only to an empty experimental DB, never merge or overwrite. */
+  async restoreEmpty(
+    raw:unknown,credential:string,method:'master'|'recovery'='master',
+    options:OwnerSessionOptions={}
+  ):Promise<OwnerVaultSession>{
+    const lock=await this.acquireOwnerLock();
+    let session:OwnerVaultSession|undefined;
+    try{
+      if(await this.db.headers.count()||await this.db.records.count()){
+        throw new Error('Recovery requires an empty vault; existing encrypted records were preserved');
+      }
+      // Cryptographically authenticate the manifest and EVERY record before
+      // beginning an IndexedDB transaction. Never await Web Crypto inside IDB.
+      const verified=await verifyEncryptedVaultTransfer(raw,credential,method);
+      const {bundle,key}=verified;
+      await this.db.transaction('rw',this.db.headers,this.db.records,async()=>{
+        if(await this.db.headers.count()||await this.db.records.count()){
+          throw new Error('Recovery target is not empty; no records were replaced');
+        }
+        await this.db.headers.add({id:'primary',value:bundle.header,verifierId:bundle.verifierId});
+        await this.db.records.bulkAdd(bundle.records.map(envelope=>({
+          recordId:envelope.recordId,envelope
+        })));
+      });
+      session=new OwnerVaultSession(this.sessionIO(),key,lock,options);
+      return session;
+    }catch(error){
+      if(!session)await lock.release();
+      throw error;
+    }
+  }
+  private async exportEncrypted(key:CryptoKey,owned:()=>boolean):Promise<EncryptedVaultTransfer>{
+    if(!owned())throw new Error('Vault owner lock lost before backup export');
+    const {header,verifierId}=await this.readHeader();
+    const rows=await this.db.records.toArray();
+    for(const row of rows){
+      if(row.recordId!==row.envelope.recordId){
+        throw new Error('Encrypted record identity mismatch; backup not exported');
+      }
+    }
+    const bundle=await createEncryptedVaultTransfer(
+      header,key,verifierId,rows.map(row=>row.envelope)
+    );
+    if(!owned())throw new Error('Vault owner lock lost during backup export');
+    return bundle;
   }
   private async acquireOwnerLock(){
     const lock=new OwnerVaultLock();
