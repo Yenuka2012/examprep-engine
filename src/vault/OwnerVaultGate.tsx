@@ -8,6 +8,7 @@ import {ExperimentalVaultRepository,type OwnerVaultSession} from './storage';
 import {MAX_VAULT_TRANSFER_BYTES} from './transfer';
 import {SyntheticLegacySource} from './syntheticLegacy';
 import {rehearseSyntheticMigration,verifySyntheticMigrationCopy} from './migration';
+import {assessV03MigrationReadiness} from './productionReadiness';
 
 type VaultView='Manage Content'|'Exam Practice';
 export default function OwnerVaultGate({idleMs,lockOnHidden}:{
@@ -18,6 +19,7 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
   // SyntheticLegacySource NEVER opens or imports the production exam database.
   const legacy=useMemo(()=>new SyntheticLegacySource(),[]);
   const sessionRef=useRef<OwnerVaultSession|null>(null);
+  const syntheticFreezeRef=useRef<(()=>Promise<void>)|null>(null);
   const [phase,setPhase]=useState<'checking'|'setup'|'locked'|'unlocked'>('checking');
   const [master,setMaster]=useState('');
   const [recovery,setRecovery]=useState('');
@@ -42,6 +44,8 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
       mounted=false;
       const session=sessionRef.current;
       sessionRef.current=null;
+      void syntheticFreezeRef.current?.();
+      syntheticFreezeRef.current=null;
       legacy.close();
       if(session)void session.lock().finally(()=>repository.close());
       else repository.close();
@@ -208,6 +212,42 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
     }catch(error){report(error);}
     finally{setBusy(false);}
   }
+  async function assessSyntheticReadiness(){
+    if(busy)return;
+    setError('');setNotice('');setBusy(true);
+    try{
+      const snapshot=await legacy.snapshot();
+      // Deliberately missing owner acceptance and storage evidence:
+      // a synthetic test can NEVER authorize real browser data migration.
+      const report=assessV03MigrationReadiness({snapshot});
+      setNotice('Synthetic v0.3 readiness: '+report.verdict+
+        ' ('+report.findings.filter(item=>item.severity==='block').length+
+        ' blocking gates). No real user data was inspected.');
+    }catch(error){report(error);}
+    finally{setBusy(false);}
+  }
+  async function holdSyntheticFreeze(){
+    if(busy)return;
+    setError('');setNotice('');setBusy(true);
+    try{
+      if(syntheticFreezeRef.current)throw new Error('Synthetic writer freeze already held');
+      syntheticFreezeRef.current=await legacy.freezeWrites();
+      setNotice('Exclusive synthetic writer freeze held; synthetic source mutations are blocked.');
+    }catch(error){report(error);}
+    finally{setBusy(false);}
+  }
+  async function releaseSyntheticFreeze(){
+    if(busy)return;
+    setError('');setNotice('');setBusy(true);
+    try{
+      const release=syntheticFreezeRef.current;
+      if(!release)throw new Error('No synthetic writer freeze is held');
+      syntheticFreezeRef.current=null;
+      await release();
+      setNotice('Synthetic writer freeze released.');
+    }catch(error){report(error);}
+    finally{setBusy(false);}
+  }
   async function changeSyntheticSource(){
     if(busy)return;
     setError('');setNotice('');setBusy(true);
@@ -310,6 +350,15 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
         <p>Source: examprep-synthetic-legacy-v1. Production examprep-v1 is never opened.</p>
         <button disabled={busy} onClick={()=>void seedSyntheticSource()}>
           Seed synthetic legacy source
+        </button>
+        <button disabled={busy} onClick={()=>void assessSyntheticReadiness()}>
+          Audit synthetic v0.3 readiness
+        </button>
+        <button disabled={busy} onClick={()=>void holdSyntheticFreeze()}>
+          Hold synthetic writer freeze
+        </button>
+        <button disabled={busy} onClick={()=>void releaseSyntheticFreeze()}>
+          Release synthetic writer freeze
         </button>
         <button disabled={busy} onClick={()=>void rehearseMigration(true)}>
           Simulate migration interruption
