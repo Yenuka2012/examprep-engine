@@ -293,7 +293,8 @@ export async function rehearseSyntheticMigration(
     const saved=await session.save('migration-journal',completed,{
       recordId:journalId,expectedNonce:nonce
     });
-    journal=completed;nonce=saved.nonce;
+    // The authenticated final read-back below is authoritative.
+    nonce=saved.nonce;
   }
   const final=await session.read(journalId);
   if(!final||final.nonce!==nonce||validateJournal(final.value).status!=='validated'){
