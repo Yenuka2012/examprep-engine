@@ -39,6 +39,8 @@ jobs:
         run: npm test
       - name: Production build
         run: npm run build
+      - name: Assert production entry graph and dist exclude experimental vault
+        run: node scripts/verify-production-isolation.mjs
       - name: Generate CycloneDX dependency inventory
         run: npm sbom --sbom-format cyclonedx > sbom.cdx.json
       - name: Hash production assets

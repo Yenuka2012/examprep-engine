@@ -2,7 +2,7 @@
 
 A free, browser-based, local-first exam preparation application for multiple certifications.
 
-## Available capabilities (v0.3.0 deployed; owner physical-device acceptance pending)
+## Available capabilities (v0.3.1 release; owner physical-device acceptance pending)
 - JSON question-bank import with strict schema validation (single- and multiple-choice)
 - Timed examinations, question navigation, flags, scoring and answer review
 - Persistent local question banks, history, unfinished exams, certification profiles and versioned syllabus catalogs using IndexedDB (Dexie schema v3)
@@ -12,6 +12,9 @@ A free, browser-based, local-first exam preparation application for multiple cer
 - Scoped offline-capable PWA (after first online load)
 - CI typechecking, unit/security tests, reproducible npm ci, dependency audit, Chromium/WebKit Playwright, CodeQL, SBOM and asset hashes
 - GitHub Pages deployment requires passing verify, browser and CodeQL gates on the same workflow run
+
+## v0.3.1 non-destructive security foundations release
+The isolated S1–S5 vault cryptography, authenticated transfer, synthetic migration journal and fail-closed readiness source are included for automated testing only. The **production application entry and UI are unchanged**; the synthetic vault harness is not served on GitHub Pages. The active examprep-v1 database is still plaintext at rest and is neither migrated nor deleted. See [release decision](docs/releases/V0.3.1-SECURITY-FOUNDATIONS-RELEASE.md). The encrypted vault is NOT activated and issue #100 remains a blocker for real cutover.
 
 ## Security boundaries
 The application source is public. Uploaded questions and answers stay in local browser storage, **not encrypted at rest**; local browser/extension compromise and storage eviction remain risks. Encrypted backups require a strong unique passphrase. Unfinished exam sessions are **not included in the current logical-v2 backup**. Finish an exam before relying on a full export. This is not an officially endorsed or proctored exam system.
@@ -43,7 +46,7 @@ The certification/syllabus catalog was merged in v0.3.0. The additive Dexie v3 s
 
 **Do not roll back to v0.2.1 on an upgraded profile.** Dexie v3 maps to native IndexedDB version 30; the older v2 application expects 20 and cannot open an upgraded database. Preserve the browser profile, use compatible v3 recovery builds, and verify encrypted backup restore in a fresh profile before any future migration. See [architecture](docs/architecture/M1.1-CATALOG-DESIGN.md) and [release acceptance](docs/releases/M1.1-PRODUCTION-ACCEPTANCE.md).
 
-The open M2 design/hosting/vault PRs are **prototypes, not deployed production encryption**. They will retain one free/open-source static PWA codebase for public GitHub Pages and a private Ubuntu VM, and provide single-owner Manage Content and Exam Practice modes. GitHub Pages **cannot provide server-side login**; its browser-vault unlock is local cryptographic access control, not remote authentication. iPad support is in scope, with physical iPadOS acceptance pending.
+The staged M2 vault source is **test-only security foundations, not deployed production encryption**. Further migration and hosting prototypes require separate review. They will retain one free/open-source static PWA codebase for public GitHub Pages and a private Ubuntu VM, and provide single-owner Manage Content and Exam Practice modes. GitHub Pages **cannot provide server-side login**; its browser-vault unlock is local cryptographic access control, not remote authentication. iPad support is in scope, with physical iPadOS acceptance pending.
 
 ## Operations
 - Question banks, exam answers and history are specific to each browser profile.
