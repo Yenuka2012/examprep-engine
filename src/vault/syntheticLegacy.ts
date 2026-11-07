@@ -63,7 +63,7 @@ export function syntheticLegacyFixture():MockLegacySnapshot{
   const activeSession:StoredSession={
     key:'current',value:{
       id:'SYNTH-SESSION-001',bank,questions:bank.questions,answers:{},marked:[],
-      index:0,startedAt:DATE,endsAt:1800000000000,durationSeconds:1800
+      index:0,startedAt:DATE,endsAt:Date.parse(DATE)+1800*1000,durationSeconds:1800
     }
   };
   return {
