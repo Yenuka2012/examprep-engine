@@ -7,7 +7,7 @@
  * This is a release-specific change freeze, not a general TS import parser.
  */
 import {createHash} from 'node:crypto';
-import {readFileSync,existsSync,readdirSync,lstatSync} from 'node:fs';
+import {readFileSync,readdirSync,openSync,closeSync,fstatSync,constants} from 'node:fs';
 import {resolve,relative,join} from 'node:path';
 
 const root=resolve(process.cwd());
@@ -63,11 +63,19 @@ function gitBlobSha(content){
   return createHash('sha1').update('blob '+content.byteLength+'\0')
     .update(content).digest('hex');
 }
+function readRegular(path){
+  // Open a single file descriptor without following symlinks. Never stat
+  // one filesystem object and then read a potentially replaced path.
+  const fd=openSync(path,constants.O_RDONLY|constants.O_NOFOLLOW);
+  try{
+    if(!fstatSync(fd).isFile())fail('not a regular file: '+relative(root,path));
+    return readFileSync(fd);
+  }finally{
+    closeSync(fd);
+  }
+}
 function checkFile(name){
-  const file=resolve(root,name);
-  if(!existsSync(file))fail('required source file missing: '+name);
-  if(lstatSync(file).isSymbolicLink())fail('symlink not permitted: '+name);
-  const actual=gitBlobSha(readFileSync(file));
+  const actual=gitBlobSha(readRegular(resolve(root,name)));
   if(actual!==frozen[name])fail('approved production source drift: '+name);
 }
 for(const name of Object.keys(frozen))checkFile(name);
@@ -95,31 +103,36 @@ const lock=JSON.parse(readFileSync(resolve(root,'package-lock.json'),'utf8'));
 if(lock.version!=='0.3.1'||lock.packages?.['']?.version!=='0.3.1')
   fail('release package and lockfile version mismatch');
 const site=resolve(root,'dist');
-if(!existsSync(site)||!existsSync(join(site,'index.html')))
-  fail('missing production Vite build');
+// Directory traversal below fails on a missing dist; index is verified after
+// scanning the same opened file objects, with no existence-check race.
 const forbidden=[
  'examprep-secure-vault-v1','examprep-synthetic-legacy-v1',
  'SYNTHETIC-PRIVATE-QUESTION-KEY','SYNTHETIC-DECRYPTED-SAFARI',
  'SYNTHETIC-ENCRYPTED-ONLY','vault-harness.html'
 ];
 let count=0;
+const shipped=new Set();
 function scan(dir){
   for(const item of readdirSync(dir,{withFileTypes:true})){
     const path=join(dir,item.name);
     if(item.isDirectory())scan(path);
     else if(item.isFile()){
       count++;
+      shipped.add(relative(site,path));
       if(item.name==='vault-harness.html')fail('synthetic vault harness shipped');
       if(!/\.(?:js|css|html|webmanifest|json|txt)$/.test(item.name))continue;
-      const contents=readFileSync(path,'utf8');
+      const contents=readRegular(path).toString('utf8');
       for(const marker of forbidden){
         if(contents.includes(marker))
           fail('experimental marker shipped in '+relative(site,path)+': '+marker);
       }
+    }else if(item.isSymbolicLink()){
+      fail('symlink in production output: '+relative(site,path));
     }
   }
 }
 scan(site);
+if(!shipped.has('index.html'))fail('production index.html is missing');
 if(count===0)fail('empty production site');
 console.log('PASS: '+Object.keys(frozen).length+
   ' approved production source blobs unchanged; '+count+
