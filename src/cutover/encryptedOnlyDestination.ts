@@ -50,6 +50,7 @@ export class EncryptedOnlyDestination {
   #phase:DestinationPhase='LOCKED';
   #session:AuthenticatedVaultSessionPort|null=null;
   #epoch=0;
+  #locking=false;
 
   get phase():DestinationPhase{return this.#phase;}
 
@@ -58,7 +59,7 @@ export class EncryptedOnlyDestination {
    * source the port from the audited crypto verifier, never a local marker.
    */
   attachVerifiedSession(session:AuthenticatedVaultSessionPort):void{
-    if(this.#phase!=='LOCKED'||this.#session){
+    if(this.#phase!=='LOCKED'||this.#session||this.#locking){
       throw new Error('Destination cannot be reattached without explicitly ending the previous owner session.');
     }
     if(!session||!session.active){
@@ -120,11 +121,20 @@ export class EncryptedOnlyDestination {
    * The eventual UI integration must also clear decrypted React UI state.
    */
   async lock():Promise<void>{
+    if(this.#locking)throw new Error('Vault lock release is already in progress.');
+    this.#locking=true;
     const old=this.#session;
     this.#session=null;
     this.#epoch++;
     if(this.#phase!=='RECOVERY_REQUIRED')this.#phase='LOCKED';
-    if(old)await old.lock();
+    try{
+      if(old)await old.lock();
+    }catch{
+      this.#phase='RECOVERY_REQUIRED';
+      throw new Error(RECOVERY);
+    }finally{
+      this.#locking=false;
+    }
   }
 
   #invalidateToRecovery():void{
