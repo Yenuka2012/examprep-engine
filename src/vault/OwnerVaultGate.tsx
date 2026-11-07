@@ -5,6 +5,8 @@
  */
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {ExperimentalVaultRepository,type OwnerVaultSession} from './storage';
+import {type EncryptedOnlyDestination} from '../cutover/encryptedOnlyDestination';
+import {enrollEncryptedDestination,unlockEncryptedDestination,restoreEncryptedDestinationIntoEmpty} from './verifiedDestinationBridge';
 import {MAX_VAULT_TRANSFER_BYTES} from './transfer';
 
 type VaultView='Manage Content'|'Exam Practice';
@@ -13,6 +15,7 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
 }){
   const repository=useMemo(()=>new ExperimentalVaultRepository(),[]);
   const sessionRef=useRef<OwnerVaultSession|null>(null);
+  const destinationRef=useRef<EncryptedOnlyDestination|null>(null);
   const [phase,setPhase]=useState<'checking'|'setup'|'locked'|'unlocked'>('checking');
   const [master,setMaster]=useState('');
   const [recovery,setRecovery]=useState('');
@@ -36,14 +39,18 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
     return ()=>{
       mounted=false;
       const session=sessionRef.current;
+      const destination=destinationRef.current;
       sessionRef.current=null;
-      if(session)void session.lock().finally(()=>repository.close());
+      destinationRef.current=null;
+      if(destination)void destination.lock().finally(()=>repository.close());
+      else if(session)void session.lock().finally(()=>repository.close());
       else repository.close();
     };
   },[repository]);
 
   function clearPrivateState(){
     sessionRef.current=null;
+    destinationRef.current=null;
     setMaster('');setRecovery('');setPrivateNote('');setVisibleNote('');
     setSavedRef(null);setWorkspace('Manage Content');
     setPhase('locked');
@@ -60,8 +67,9 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
     if(busy)return;
     setError('');setNotice('');setBusy(true);
     try{
-      const session=await repository.enroll(master,recovery,sessionOptions());
-      sessionRef.current=session;
+      const {owner,destination}=await enrollEncryptedDestination(repository,master,recovery,sessionOptions());
+      sessionRef.current=owner;
+      destinationRef.current=destination;
       setPhase('unlocked');
       setNotice('Synthetic vault enrolled. Recovery credential must be stored separately.');
     }catch(error){report(error);}
@@ -71,8 +79,9 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
     if(busy)return;
     setError('');setNotice('');setBusy(true);
     try{
-      const session=await repository.unlock(master,unlockMethod,sessionOptions());
-      sessionRef.current=session;
+      const {owner,destination}=await unlockEncryptedDestination(repository,master,unlockMethod,sessionOptions());
+      sessionRef.current=owner;
+      destinationRef.current=destination;
       setPhase('unlocked');
       setNotice('Owner vault unlocked cryptographically. No server authentication is implied.');
     }catch(error){report(error);}
@@ -82,7 +91,8 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
     if(busy)return;
     setBusy(true);setError('');setNotice('');
     try{
-      await sessionRef.current?.lock();
+      if(destinationRef.current)await destinationRef.current.lock();
+      else await sessionRef.current?.lock();
       clearPrivateState();
       setNotice('Vault locked.');
     }catch(error){report(error);}
@@ -154,8 +164,11 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
         throw new Error('Encrypted vault transfer must be 1 byte–64 MiB');
       }
       const raw:unknown=JSON.parse(await file.text());
-      const session=await repository.restoreEmpty(raw,restoreSecret,restoreMethod,sessionOptions());
-      sessionRef.current=session;
+      const {owner,destination}=await restoreEncryptedDestinationIntoEmpty(
+        repository,raw,restoreSecret,restoreMethod,sessionOptions()
+      );
+      sessionRef.current=owner;
+      destinationRef.current=destination;
       setPhase('unlocked');
       setNotice('Authenticated encrypted vault recovered into an empty browser profile.');
     }catch(error){report(error);}
@@ -172,7 +185,9 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
       const target=savedRef?.recordId??(await repository.encryptedRecords())
         .find(record=>record.recordType==='bank')?.recordId;
       if(!target)throw new Error('No synthetic encrypted note exists');
-      const result=await session.read(target);
+      const destination=destinationRef.current;
+      if(!destination)throw new Error('Encrypted-only destination is unavailable');
+      const result=await destination.read(target);
       if(!result||result.recordType!=='bank'||!result.value||
          typeof result.value!=='object'||!('kind' in result.value)||
          result.value.kind!=='synthetic-private-note'||!('text' in result.value)||

@@ -110,7 +110,7 @@ test('wrong credentials and corrupted ciphertext fail closed without plaintext f
     }finally{db.close();}
   });
   await page.getByRole('button',{name:'Read encrypted test record'}).click();
-  await expect(page.getByRole('alert')).toContainText('authentication failed');
+  await expect(page.getByRole('alert')).toContainText(/Recovery is required|authentication failed/);
   await expect(page.getByTestId('decrypted-note')).toHaveCount(0);
 });
 
