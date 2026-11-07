@@ -60,7 +60,7 @@ const frozen={
 const excluded=['src/vault/','src/cutover/','src/generated/'];
 function fail(message){throw new Error('Production isolation gate failed: '+message);}
 function gitBlobSha(content){
-  return createHash('sha1').update('blob '+content.byteLength+'\\0')
+  return createHash('sha1').update('blob '+content.byteLength+'\0')
     .update(content).digest('hex');
 }
 function checkFile(name){
@@ -110,7 +110,7 @@ function scan(dir){
     else if(item.isFile()){
       count++;
       if(item.name==='vault-harness.html')fail('synthetic vault harness shipped');
-      if(!/\\.(?:js|css|html|webmanifest|json|txt)$/.test(item.name))continue;
+      if(!/\.(?:js|css|html|webmanifest|json|txt)$/.test(item.name))continue;
       const contents=readFileSync(path,'utf8');
       for(const marker of forbidden){
         if(contents.includes(marker))
