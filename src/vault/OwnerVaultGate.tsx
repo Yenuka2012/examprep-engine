@@ -18,6 +18,7 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
   const sessionRef=useRef<OwnerVaultSession|null>(null);
   const destinationRef=useRef<EncryptedOnlyDestination|null>(null);
   const uiGenerationRef=useRef(0);
+  const lockHadFailureRef=useRef(false);
   const [phase,setPhase]=useState<'checking'|'setup'|'locked'|'unlocked'>('checking');
   const [master,setMaster]=useState('');
   const [recovery,setRecovery]=useState('');
@@ -65,6 +66,7 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
   }
   function sessionOptions(){
     return {idleMs,lockOnHidden,onLocked:()=>{
+      lockHadFailureRef.current=false;
       // Hide the entire synthetic workspace synchronously even if React is
       // interrupted, then flush all React state changes before returning.
       document.documentElement.classList.add('vault-redacting');
@@ -77,11 +79,15 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
       });
       document.documentElement.classList.remove('vault-redacting');
     },onPendingFailure:()=>{
-      // No secrets/exception messages are used in this locked-state notice.
+      // Do not overwrite this warning on a later successful lock release.
+      lockHadFailureRef.current=true;
       setNotice('A pending encrypted operation or owner lock release failed. Verify durable records and an independent backup before continuing.');
     },onReleaseSettled:(released:boolean)=>{
       setLockDraining(!released);
       if(!released)setError('Vault lock release could not be confirmed; preserve data and retry recovery.');
+      else if(!lockHadFailureRef.current){
+        setNotice('Vault locked. Accepted operations settled; verify saved work after re-unlock.');
+      }
     }};
   }
   function report(error:unknown){
@@ -118,8 +124,8 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
     try{
       if(destinationRef.current)await destinationRef.current.lock();
       else await sessionRef.current?.lock();
-      // State was already redacted synchronously by onLocked.
-      setNotice('Vault locked.');
+      // Do not overwrite a deferred-write failure reported by onPendingFailure.
+      // The onReleaseSettled callback owns the final locked-state notice.
     }catch(error){report(error);}
     finally{setBusy(false);}
   }
