@@ -9,12 +9,18 @@ import {ExperimentalVaultRepository,type OwnerVaultSession} from './storage';
 import {type EncryptedOnlyDestination} from '../cutover/encryptedOnlyDestination';
 import {enrollEncryptedDestination,unlockEncryptedDestination,restoreEncryptedDestinationIntoEmpty} from './verifiedDestinationBridge';
 import {MAX_VAULT_TRANSFER_BYTES} from './transfer';
+import {SyntheticLegacySource} from './syntheticLegacy';
+import {rehearseSyntheticMigration,verifySyntheticMigrationCopy} from './migration';
+import {assessV03MigrationReadiness} from './productionReadiness';
 
 type VaultView='Manage Content'|'Exam Practice';
 export default function OwnerVaultGate({idleMs,lockOnHidden}:{
   idleMs?:number;lockOnHidden?:boolean
 }){
   const repository=useMemo(()=>new ExperimentalVaultRepository(),[]);
+  // Hard-coded non-production database. Synthetic rehearsal never opens examprep-v1.
+  const syntheticSource=useMemo(()=>new SyntheticLegacySource(),[]);
+  const syntheticFreezeRef=useRef<(()=>Promise<void>)|null>(null);
   const sessionRef=useRef<OwnerVaultSession|null>(null);
   const destinationRef=useRef<EncryptedOnlyDestination|null>(null);
   const uiGenerationRef=useRef(0);
@@ -48,6 +54,15 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
       const session=sessionRef.current;
       const destination=destinationRef.current;
       const pendingRelease=pendingOwnerReleaseRef.current;
+      const releaseSynthetic=syntheticFreezeRef.current;
+      syntheticFreezeRef.current=null;
+      // Release rehearsal writer lease before closing synthetic DB. All
+      // real owner writes continue to drain behind the separate vault lock.
+      void (async()=>{
+        try{await releaseSynthetic?.();}catch{
+          // Test-only lease release failure never deletes source data.
+        }finally{syntheticSource.close();}
+      })();
       sessionRef.current=null;
       destinationRef.current=null;
       // Redaction intentionally erased public owner references immediately.
@@ -58,12 +73,17 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
       else if(pendingRelease)void pendingRelease.catch(()=>undefined).finally(()=>repository.close());
       else repository.close();
     };
-  },[repository]);
+  },[repository,syntheticSource]);
 
   function clearPrivateState(){
     // A generation change invalidates any async UI continuation that started
     // under a previous owner session, including late accepted saves/reads.
     uiGenerationRef.current++;
+    // A browser background event cannot synchronously release an IDB-backed
+    // Web Lock; drop the UI reference and release the synthetic lease safely.
+    const releaseSynthetic=syntheticFreezeRef.current;
+    syntheticFreezeRef.current=null;
+    if(releaseSynthetic)void releaseSynthetic().catch(()=>undefined);
     sessionRef.current=null;
     destinationRef.current=null;
     setMaster('');setRecovery('');setRestoreSecret('');setRestoreFile(null);
@@ -245,6 +265,119 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
       setBusy(false);setRestoreFile(null);setRestoreSecret('');
     }
   }
+  async function seedSyntheticSource(){
+    if(busy)return;
+    const generation=uiGenerationRef.current;
+    setError('');setNotice('');setBusy(true);
+    try{
+      const created=await syntheticSource.seedIfEmpty();
+      if(generation===uiGenerationRef.current)setNotice(created?
+        'Synthetic legacy source seeded with five record classes.':
+        'Synthetic source already exists; no records were replaced.');
+     }catch(error){
+      if(generation===uiGenerationRef.current)report(error);
+    }finally{
+      if(generation===uiGenerationRef.current)setBusy(false);
+    }
+  }
+  async function rehearseMigration(interrupt:boolean){
+    if(busy)return;
+    const generation=uiGenerationRef.current;
+    setError('');setNotice('');setBusy(true);
+    try{
+      const session=sessionRef.current;
+      if(!session)throw new Error('Vault owner must unlock before migration rehearsal');
+      session.touch();
+      const result=await rehearseSyntheticMigration(
+        session,legacy,interrupt?{interruptAfterWriteBeforeCheckpoint:1}:{}
+      );
+      if(generation===uiGenerationRef.current)setNotice('Synthetic migration validated: '+result.records+
+        ' encrypted records; '+result.resumedRecords+' resumed, '+
+        result.copiedRecords+' newly copied. Source remains unchanged.');
+     }catch(error){
+      if(generation===uiGenerationRef.current)report(error);
+    }finally{
+      if(generation===uiGenerationRef.current)setBusy(false);
+    }
+  }
+  async function verifyMigration(){
+    if(busy)return;
+    const generation=uiGenerationRef.current;
+    setError('');setNotice('');setBusy(true);
+    try{
+      const session=sessionRef.current;
+      if(!session)throw new Error('Unlock owner vault to validate migration');
+      session.touch();
+      const report=await verifySyntheticMigrationCopy(session);
+      if(generation===uiGenerationRef.current)setNotice('Verified '+report.records+' encrypted migration records against authenticated journal.');
+     }catch(error){
+      if(generation===uiGenerationRef.current)report(error);
+    }finally{
+      if(generation===uiGenerationRef.current)setBusy(false);
+    }
+  }
+  async function assessSyntheticReadiness(){
+    if(busy)return;
+    const generation=uiGenerationRef.current;
+    setError('');setNotice('');setBusy(true);
+    try{
+      const snapshot=await syntheticSource.snapshot();
+      // Deliberately missing owner acceptance and storage evidence:
+      // a synthetic test can NEVER authorize real browser data migration.
+      const report=assessV03MigrationReadiness({snapshot});
+      if(generation===uiGenerationRef.current)setNotice('Synthetic v0.3 readiness: '+report.verdict+
+        ' ('+report.findings.filter(item=>item.severity==='block').length+
+        ' blocking gates). No real user data was inspected.');
+     }catch(error){
+      if(generation===uiGenerationRef.current)report(error);
+    }finally{
+      if(generation===uiGenerationRef.current)setBusy(false);
+    }
+  }
+  async function holdSyntheticFreeze(){
+    if(busy)return;
+    const generation=uiGenerationRef.current;
+    setError('');setNotice('');setBusy(true);
+    try{
+      if(syntheticFreezeRef.current)throw new Error('Synthetic writer freeze already held');
+      syntheticFreezeRef.current=await syntheticSource.freezeWrites();
+      if(generation===uiGenerationRef.current)setNotice('Exclusive synthetic writer freeze held; synthetic source mutations are blocked.');
+     }catch(error){
+      if(generation===uiGenerationRef.current)report(error);
+    }finally{
+      if(generation===uiGenerationRef.current)setBusy(false);
+    }
+  }
+  async function releaseSyntheticFreeze(){
+    if(busy)return;
+    const generation=uiGenerationRef.current;
+    setError('');setNotice('');setBusy(true);
+    try{
+      const release=syntheticFreezeRef.current;
+      if(!release)throw new Error('No synthetic writer freeze is held');
+      syntheticFreezeRef.current=null;
+      await release();
+      if(generation===uiGenerationRef.current)setNotice('Synthetic writer freeze released.');
+     }catch(error){
+      if(generation===uiGenerationRef.current)report(error);
+    }finally{
+      if(generation===uiGenerationRef.current)setBusy(false);
+    }
+  }
+  async function changeSyntheticSource(){
+    if(busy)return;
+    const generation=uiGenerationRef.current;
+    setError('');setNotice('');setBusy(true);
+    try{
+      await syntheticSource.modifySourceForTest();
+      if(generation===uiGenerationRef.current)setNotice('Synthetic-only source changed; resuming must now fail closed.');
+     }catch(error){
+      if(generation===uiGenerationRef.current)report(error);
+    }finally{
+      if(generation===uiGenerationRef.current)setBusy(false);
+    }
+  }
+
   async function read(){
     const startingGeneration=uiGenerationRef.current;
     setError('');setNotice('');setBusy(true);
@@ -346,6 +479,35 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
       <button disabled={busy} onClick={()=>void exportPortableBackup()}>
         Export encrypted vault transfer
       </button>
+      <section aria-label="Synthetic migration rehearsal">
+        <h3>Synthetic-only legacy migration rehearsal</h3>
+        <p>Source: examprep-synthetic-legacy-v1. Production examprep-v1 is never opened.</p>
+        <p>A passing technical readiness assessment never authorizes live migration.</p>
+        <button disabled={busy} onClick={()=>void seedSyntheticSource()}>
+          Seed synthetic legacy source
+        </button>
+        <button disabled={busy} onClick={()=>void assessSyntheticReadiness()}>
+          Audit synthetic v0.3 readiness
+        </button>
+        <button disabled={busy} onClick={()=>void holdSyntheticFreeze()}>
+          Hold synthetic writer freeze
+        </button>
+        <button disabled={busy} onClick={()=>void releaseSyntheticFreeze()}>
+          Release synthetic writer freeze
+        </button>
+        <button disabled={busy} onClick={()=>void rehearseMigration(true)}>
+          Simulate migration interruption
+        </button>
+        <button disabled={busy} onClick={()=>void rehearseMigration(false)}>
+          Resume synthetic migration
+        </button>
+        <button disabled={busy} onClick={()=>void verifyMigration()}>
+          Verify encrypted migration copy
+        </button>
+        <button disabled={busy} onClick={()=>void changeSyntheticSource()}>
+          Mutate synthetic source for negative test
+        </button>
+      </section>
       <button disabled={busy||!savedRef} onClick={()=>void attemptStaleSave()}>
         Attempt stale encrypted write
       </button>
