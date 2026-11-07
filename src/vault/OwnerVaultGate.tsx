@@ -112,7 +112,8 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
     finally{setBusy(false);setMaster('');setRecovery('');}
   }
   async function lock(){
-    if(busy)return;
+    // Lock remains available during accepted async writes. The session
+    // immediately redacts the view, then holds its Web Lock for write drain.
     setBusy(true);setError('');setNotice('');
     try{
       if(destinationRef.current)await destinationRef.current.lock();
@@ -323,7 +324,7 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
         Attempt stale encrypted write
       </button>
       {visibleNote&&<p data-testid="decrypted-note">{visibleNote}</p>}
-      <button disabled={busy} onClick={()=>void lock()}>Lock vault</button>
+      <button onClick={()=>void lock()}>Lock vault</button>
     </section>}
   </main>;
 }
