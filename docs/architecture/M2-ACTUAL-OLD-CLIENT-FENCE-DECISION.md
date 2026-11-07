@@ -95,3 +95,5 @@ unfulfilled. Do not close issue #100 until the outstanding gates pass.
 References: Dexie VersionError https://dexie.org/docs/DexieErrors/Dexie.VersionError
 and IndexedDB versionchange guidance at
 https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API/Using_IndexedDB .
+
+Build isolation command: npm run build -- --mode mixed-cutover --outDir dist-mixed-candidate. The normal Pages build uses the default Vite mode and original base path.
