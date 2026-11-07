@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ExamLock } from './examLock';
 import { SessionSaveQueue } from './saveQueue';
 import {assertRestorableBackupSize,MAX_BACKUP_FILE_BYTES} from './backupSize';
 import PwaStatus from './PwaStatus';
 import StorageCompatibilityStatus from './StorageCompatibilityStatus';
+import {getStorageUpdateMessage,subscribeStorageUpdate} from './storageVersionGuard';
 import CutoverReadinessPanel from './CutoverReadinessPanel';
 import CatalogPanel from './CatalogPanel';
 import { completeActiveExam, createActiveExam, loadActiveExam, saveActiveExam } from './examPersistence';
@@ -25,6 +26,9 @@ function formatDate(s:string){return new Date(s).toLocaleString();}
 function pct(a:number,b:number){return b ? Math.round(a/b*100) : 0;}
 
 export default function App() {
+  const storageUpdateMessage=useSyncExternalStore(
+    subscribeStorageUpdate,getStorageUpdateMessage,getStorageUpdateMessage
+  );
   const [page,setPage]=useState<Page>('dashboard');
   const [banks,setBanks]=useState<QuestionBank[]>([]);
   const [attempts,setAttempts]=useState<Attempt[]>([]);
@@ -392,7 +396,13 @@ export default function App() {
       {page==='exam'&&session&&examAccess!=='owner'&&<section className="panel" role="status"><h3>Exam locked to another tab</h3><p className="muted">This tab is read-only. Your existing exam is preserved. To continue here, first close the owning exam tab, then select Resume here. Unsupported browser locking disables editing to protect your answers.</p><button className="primary" disabled={!sessionLoaded||examAccess==='unsupported'} onClick={()=>void retryExamOwnership()}>Resume here</button></section>}
       {page==='exam'&&!session&&examAccess==='blocked'&&<section className="panel" role="status"><h3>Another tab owns the exam</h3><p className="muted">Close the owning tab before resuming; no local exam data has been modified.</p><button className="primary" onClick={()=>void retryExamOwnership()}>Resume here</button></section>}
       {page==='exam'&&!session&&examAccess==='unsupported'&&<section className="panel" role="alert"><h3>Secure exam locking unavailable</h3><p className="muted">This browser does not expose the Web Locks API. Exams are disabled rather than allowing concurrent writes.</p></section>}
-      {page==='exam'&&session&&examAccess==='owner'&&(()=>{const q=session.questions[session.index];const picked=session.answers[q.id]??[];return <div className="stack">
+      {page==='exam'&&session&&examAccess==='owner'&&!!storageUpdateMessage&&
+        <section className="panel" role="alert" aria-label="Exam storage compatibility read-only">
+          <h3>Exam read-only — storage update required</h3>
+          <p className="muted">This tab detected an incompatible database version. Editing and submission are disabled to prevent unsafe writes. The in-memory exam state has not been cleared, but recent changes may not be durably saved. Do not reload, close or clear storage until recovery is verified.</p>
+          <p className="muted">Complete recovery or update using a compatible application. An encrypted logical-v2 backup does not contain unfinished exam sessions.</p>
+        </section>}
+      {page==='exam'&&session&&examAccess==='owner'&&!storageUpdateMessage&&(()=>{const q=session.questions[session.index];const picked=session.answers[q.id]??[];return <div className="stack">
         <section role="status" aria-live="polite" className={'alert '+(saveStatus==='failed'?'warn':'')}>
           {saveStatus==='saved'?'Exam progress saved locally.':saveStatus==='saving'?'Saving exam progress…':'Autosave failed. Latest changes may be unsaved.'}
           {saveStatus==='failed'&&<button onClick={retrySave}>Retry save</button>}
