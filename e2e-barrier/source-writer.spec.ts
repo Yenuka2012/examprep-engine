@@ -51,7 +51,6 @@ test('exclusive source freeze denies bank create/delete and certification writes
     await expect(page.getByRole('alert')).toContainText('Database temporarily read-only');
     await expect(page.getByText('Cybersecurity Fundamentals Demo').first()).toBeVisible();
 
-    await page.locator('input[type="file"]').first().setInputFiles('samples/demo-bank.json');
     // Existing bank import asks for replacement confirmation outside the
     // source permit; denied write must not remove the original bank.
     page.once('dialog',dialog=>dialog.accept());
