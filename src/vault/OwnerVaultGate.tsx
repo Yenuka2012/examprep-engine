@@ -46,8 +46,8 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
       const destination=destinationRef.current;
       sessionRef.current=null;
       destinationRef.current=null;
-      if(destination)void destination.lock().finally(()=>repository.close());
-      else if(session)void session.lock().finally(()=>repository.close());
+      if(destination)void destination.lock().catch(()=>undefined).finally(()=>repository.close());
+      else if(session)void session.lock().catch(()=>undefined).finally(()=>repository.close());
       else repository.close();
     };
   },[repository]);
