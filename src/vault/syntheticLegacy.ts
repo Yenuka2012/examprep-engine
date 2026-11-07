@@ -10,6 +10,7 @@ import type {
 
 export const SYNTHETIC_LEGACY_DATABASE='examprep-synthetic-legacy-v1';
 export const SYNTHETIC_SECRET_MARKER='SYNTHETIC-PRIVATE-QUESTION-KEY-82C6';
+export const SYNTHETIC_WRITER_LOCK='examprep-synthetic-legacy-v1-write-barrier';
 export type MockLegacySnapshot={
   banks:QuestionBank[];
   attempts:Attempt[];
@@ -73,8 +74,51 @@ export function syntheticLegacyFixture():MockLegacySnapshot{
 }
 export class SyntheticLegacySource{
   private readonly db=new MockLegacyDb();
+  private async withWriterPermit<T>(operation:()=>Promise<T>):Promise<T>{
+    if(typeof navigator==='undefined'||typeof navigator.locks?.request!=='function'){
+      throw new Error('Synthetic source writes require Web Locks');
+    }
+    return navigator.locks.request(SYNTHETIC_WRITER_LOCK,{
+      mode:'exclusive',ifAvailable:true
+    },async lock=>{
+      if(!lock)throw new Error('Synthetic source writer blocked by exclusive migration freeze');
+      return operation();
+    });
+  }
+  /**
+   * Only synthetic writers using withWriterPermit are coordinated here.
+   * This lock does NOT control the production import/catalog/backup writers.
+   */
+  async freezeWrites():Promise<()=>Promise<void>>{
+    if(typeof navigator==='undefined'||typeof navigator.locks?.request!=='function'){
+      throw new Error('Synthetic source write freeze requires Web Locks');
+    }
+    let releaseGate:(()=>void)|null=null;
+    let acknowledge:(granted:boolean)=>void=()=>undefined;
+    const granted=new Promise<boolean>(resolve=>{acknowledge=resolve;});
+    const done=navigator.locks.request(SYNTHETIC_WRITER_LOCK,{
+      mode:'exclusive',ifAvailable:true
+    },async lock=>{
+      if(!lock){acknowledge(false);return;}
+      await new Promise<void>(resolve=>{
+        releaseGate=resolve;
+        acknowledge(true);
+      });
+    });
+    if(!await granted){
+      await done;
+      throw new Error('Synthetic migration freeze is already held by another tab');
+    }
+    let released=false;
+    return async()=>{
+      if(released)return;
+      released=true;
+      releaseGate?.();
+      await done;
+    };
+  }
   async seedIfEmpty():Promise<boolean>{
-    return this.db.transaction('rw',
+    return this.withWriterPermit(()=>this.db.transaction('rw',
       this.db.banks,this.db.attempts,this.db.activeSessions,
       this.db.certifications,this.db.syllabusVersions,async()=>{
         const counts=await Promise.all([
@@ -90,7 +134,7 @@ export class SyntheticLegacySource{
         await this.db.syllabusVersions.bulkAdd(fixture.syllabusVersions);
         return true;
       }
-    );
+    ));
   }
   async snapshot():Promise<MockLegacySnapshot>{
     return this.db.transaction('r',
@@ -106,10 +150,12 @@ export class SyntheticLegacySource{
   }
   /** Deliberately mutate a synthetic source to validate resume refusal. */
   async modifySourceForTest():Promise<void>{
-    const source=await this.db.banks.get('SYNTH-BANK-001');
-    if(!source)throw new Error('Synthetic source bank missing');
-    await this.db.banks.put({
-      ...source,title:source.title+' (modified in test)'
+    return this.withWriterPermit(async()=>{
+      const source=await this.db.banks.get('SYNTH-BANK-001');
+      if(!source)throw new Error('Synthetic source bank missing');
+      await this.db.banks.put({
+        ...source,title:source.title+' (modified in test)'
+      });
     });
   }
   close(){this.db.close();}
