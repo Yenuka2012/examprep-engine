@@ -1,6 +1,6 @@
 # M2 integration review and v0.3.0 source-write barrier
 
-**Status:** Draft / review only. **Baseline:** `main` at `bcea4dc`, production `v0.3.0`. **Tracking:** #97. **No migration or deployment authorized.**
+**Status:** Draft / review only. **Original branch baseline:** `main` at `bcea4dc`, production `v0.3.0`; subsequent production test-only hotfix #99 merged to `3bf60d12`. **Tracking:** #97. **No migration or deployment authorized.**
 
 ## 1. Draft branch integration topology (verified 8 Nov 2026)
 
@@ -68,7 +68,7 @@ This draft is **not** an encrypted-at-rest release. `examprep-v1` remains plaint
 
 Before any live migration:
 - Resolve owner physical iPhone/iPad Safari/PWA and v0.3.0 **fresh-profile** encrypted backup acceptance #83;
-- Resolve intermittent WebKit secure-export RCA #76, without disabling its test;
+- Preserve the now-closed #76 trace-backed WebKit regression fix, deployed via #99; retain the enabled exact-locator test in future merges;
 - Independently review ADR #81/#84, hosting #86 and the vault chain #88/#90/#92/#94/#96;
 - Implement a version-aware old-tab kill/refresh policy, hold the exclusive freeze, test 5-store snapshot integrity, quota/eviction and interruption recovery, verify external encrypted transfer restored to a **separate profile/origin**, and obtain explicit owner authorization;
 - Separate **plaintext cleanup authorization** from migration authorization. No automatic IndexedDB deletion, browser-site-data clearing, downgrade or production release is included here.
