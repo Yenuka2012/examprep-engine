@@ -93,6 +93,10 @@ test('real pre-barrier v0.3.0 bundle bypasses an exclusive newer Web Lock',async
 });
 test('inert native upgrade alone is no storage ACL: versionless writer still works',async({context,page})=>{
   await page.goto(PROBE);
+  const newer=await context.newPage();
+  await newer.goto(NEW);
+  await expect(newer.getByRole('heading',{name:'Overview'})).toBeVisible();
+  expect(await nativeVersion(newer)).toBe(NATIVE_V3);
   const nativeResult=await page.evaluate(async name=>{
     return new Promise<'upgraded'|'blocked'|'failed'>(resolve=>{
       const request=indexedDB.open(name,PROBE_V4);
@@ -105,15 +109,15 @@ test('inert native upgrade alone is no storage ACL: versionless writer still wor
         if(completed)request.transaction?.abort();
         else{
           const db=request.result;
-          if(!db.objectStoreNames.contains('banks'))request.transaction?.objectStore('banks');
+          if(!db.objectStoreNames.contains('banks'))db.createObjectStore('banks',{keyPath:'bank_id'});
         }
       };
       request.onsuccess=()=>{request.result.close();finish('upgraded');};
       request.onerror=()=>finish('failed');
     });
   },LEGACY_DB);
-  // This isolated first-time open creates a v40 EMPTY DB (not a migration of
-  // any owner's records). This tests versionless raw access, NOT old Dexie.
+  // Synthetic empty v30 source upgraded to 40, and the newer tab must
+  // enter update-required mode after the versionchange notification.
   expect(nativeResult).toBe('upgraded');
   const wrote=await page.evaluate(async name=>{
     return new Promise<boolean>((resolve,reject)=>{
@@ -133,10 +137,8 @@ test('inert native upgrade alone is no storage ACL: versionless writer still wor
   expect(wrote).toBe(true);
   expect(await rawRecordExists(page,'VERSIONLESS-POST-40')).toBe(true);
   expect(await nativeVersion(page)).toBe(PROBE_V4);
-  const newer=await context.newPage();
   try{
-    await newer.goto(NEW);
-    await expect(newer.getByText(/storage version.*update required/i)).toBeVisible();
+    await expect(newer.getByText(/Storage update required — writes disabled/)).toBeVisible();
     await newer.getByRole('button',{name:'Check migration safety (read-only)'}).click();
     await expect(newer.getByText('Migration blocked — no data changed.')).toBeVisible();
   }finally{await newer.close();}

@@ -1,5 +1,9 @@
 import {afterEach,describe,expect,it,vi} from 'vitest';
 import {withLegacyWritePermit,LEGACY_SOURCE_WRITE_LOCK} from './legacyWriteBarrier';
+// Keep existing lock tests deterministic without an actual browser IndexedDB.
+vi.mock('./db',()=>({db:{
+  open:vi.fn(async()=>undefined),backendDB:()=>({version:30})
+}}));
 
 type SyntheticLock={name:string;mode:'shared'|'exclusive'};
 function mockLocks(){

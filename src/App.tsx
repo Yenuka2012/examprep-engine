@@ -3,6 +3,7 @@ import { ExamLock } from './examLock';
 import { SessionSaveQueue } from './saveQueue';
 import {assertRestorableBackupSize,MAX_BACKUP_FILE_BYTES} from './backupSize';
 import PwaStatus from './PwaStatus';
+import StorageCompatibilityStatus from './StorageCompatibilityStatus';
 import CutoverReadinessPanel from './CutoverReadinessPanel';
 import CatalogPanel from './CatalogPanel';
 import { completeActiveExam, createActiveExam, loadActiveExam, saveActiveExam } from './examPersistence';
@@ -356,7 +357,7 @@ export default function App() {
     </aside>
     <main className="main">
       <header className="top"><div><p className="eyebrow">EXAM PREPARATION WORKSPACE</p><h1>{page==='banks'?'Question Banks':page==='catalog'?'Certifications & Syllabi':page==='exam'?'Exam Simulator':page==='analytics'?'Learning Analytics':'Overview'}</h1></div><span className="tag">Browser-local storage</span></header>
-      <PwaStatus/>
+      <PwaStatus/><StorageCompatibilityStatus/>
       {error&&<div role="alert" className="alert bad"><strong>Action required</strong><pre>{error}</pre><button onClick={()=>setError('')}>Dismiss</button></div>}
       {notice&&<div role="status" className="alert good">{notice}<button onClick={()=>setNotice('')}>Dismiss</button></div>}
       {session&&page!=='exam'&&<div className="alert warn">{examAccess==='owner'?'You have an examination in progress.':'An examination is saved but this tab is not its active owner.'} <button onClick={()=>setPage('exam')}>View exam status</button></div>}
