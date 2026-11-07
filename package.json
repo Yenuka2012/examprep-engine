@@ -20,7 +20,10 @@
     "pretest": "npm run generate:validator",
     "pretypecheck": "npm run generate:validator",
     "test:e2e:barrier": "playwright test --config playwright.barrier.config.ts",
-    "test:e2e:mixed": "playwright test --config playwright.mixed.config.ts"
+    "test:e2e:mixed": "playwright test --config playwright.mixed.config.ts",
+    "build:vault-test": "vite build --config vite.vault.config.ts",
+    "preview:vault-test": "vite preview --config vite.vault.config.ts",
+    "test:e2e:vault": "playwright test --config playwright.vault.config.ts"
   },
   "dependencies": {
     "ajv": "8.20.0",
