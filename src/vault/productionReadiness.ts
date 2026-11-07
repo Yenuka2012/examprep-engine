@@ -7,9 +7,7 @@
  */
 import {validateBank,isCorrect} from '../logic';
 import {validateExamSession} from '../examValidation';
-import type {
-  Question,QuestionBank,Attempt,StoredSession,CertificationProfile,SyllabusVersion
-} from '../types';
+import type {CertificationProfile,SyllabusVersion} from '../types';
 
 export type MigrationGate=
   |'v03EncryptedBackupRestored'
@@ -101,8 +99,10 @@ function validateHistoricalAttempt(raw:unknown):boolean{
        choices.some(x=>!options.has(x))||
        (q.type==='single_choice'&&choices.length>1))return false;
   }
+  // raw.answers was checked as a non-array plain record above.
+  const answers=raw.answers as Record<string,unknown>;
   const computed=questions.filter(q=>isCorrect(q,
-    Object.hasOwn(raw.answers,q.id)?raw.answers[q.id] as string[]:[])).length;
+    Object.hasOwn(answers,q.id)?answers[q.id] as string[]:[])).length;
   return computed===raw.correctCount;
 }
 function certValid(raw:unknown):raw is CertificationProfile{
