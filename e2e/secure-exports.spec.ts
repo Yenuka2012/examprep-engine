@@ -9,8 +9,9 @@ test('individual bank export is authenticated ciphertext and can be restored',as
   await expect(page.getByText('Cybersecurity Fundamentals Demo').first()).toBeVisible();
 
   await page.getByPlaceholder('Enter a strong unique passphrase').fill(passphrase);
+  await expect(page.getByRole('button',{name:'Export encrypted',exact:true})).toBeEnabled();
   const downloadEvent=page.waitForEvent('download');
-  await page.getByRole('button',{name:'Export encrypted'}).first().click();
+  await page.getByRole('button',{name:'Export encrypted',exact:true}).click();
   const download=await downloadEvent;
   expect(download.suggestedFilename()).toMatch(/ENCRYPTED\.json$/);
   const raw=await readFile(await download.path(),'utf8');
@@ -45,8 +46,11 @@ test('an encrypted export requires a passphrase and does not offer a plaintext d
   await page.goto('/examprep-engine/');
   await page.getByRole('button',{name:'Question Banks',exact:true}).click();
   await page.locator('input[type="file"]').first().setInputFiles('samples/demo-bank.json');
-  await expect(page.getByRole('button',{name:'Export encrypted'}).first()).toBeVisible();
-  await page.getByRole('button',{name:'Export encrypted'}).first().click();
+  // The full-backup button has a substring-matching name but is disabled
+  // without a passphrase. Wait for the exact bank-export button to appear
+  // after its IndexedDB import transaction has committed.
+  await expect(page.getByRole('button',{name:'Export encrypted',exact:true})).toBeEnabled();
+  await page.getByRole('button',{name:'Export encrypted',exact:true}).click();
   await expect(page.getByText(/Enter a unique passphrase of at least 12 characters/)).toBeVisible();
   await expect(page.getByRole('button',{name:'Export',exact:true})).toHaveCount(0);
 });
