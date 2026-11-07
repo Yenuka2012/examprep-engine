@@ -1,6 +1,7 @@
 import {db} from './db';
 import {jsonEqual} from './jsonEqual';
 import {ExamLock} from './examLock';
+import {withLegacyWritePermit} from './legacyWriteBarrier';
 import {decryptBackup,isEncryptedBackup} from './crypto';
 import {validateBackupData,type ExamBackup} from './backup';
 
@@ -46,7 +47,9 @@ export async function restoreBackup(data:ExamBackup):Promise<Omit<RestoreResult,
   if(!lock.supported)throw new Error('Secure restore unavailable: browser Web Locks API is required');
   if(!await lock.acquire())throw new Error('Another tab is using the examination database. Close the exam tab and retry.');
   try {
-    return await db.transaction('rw',db.banks,db.attempts,db.activeSessions,db.certifications,db.syllabusVersions,async()=>{
+    // ExamLock is acquired before the source shared permit: a future
+    // exclusive migration freeze MUST use this same lock ordering.
+    return await withLegacyWritePermit(()=>db.transaction('rw',db.banks,db.attempts,db.activeSessions,db.certifications,db.syllabusVersions,async()=>{
       if(await db.activeSessions.get('current')){
         throw new Error('Finish the active examination before restoring a backup.');
       }
@@ -89,7 +92,7 @@ export async function restoreBackup(data:ExamBackup):Promise<Omit<RestoreResult,
       if(newSyllabi.length)await db.syllabusVersions.bulkAdd(newSyllabi);
       return {banksAdded:newBanks.length,attemptsAdded:newAttempts.length,
         certificationsAdded:newCertifications.length,syllabiAdded:newSyllabi.length};
-    });
+    }));
   }finally{
     await lock.release();
   }
