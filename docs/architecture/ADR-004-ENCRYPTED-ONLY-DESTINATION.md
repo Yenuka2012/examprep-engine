@@ -51,6 +51,8 @@ recovery flow. Use no synthetic state to authorize migration.
 3. After an in-flight encrypted read begins, user lock, browser background
    lock, or any failed concurrent authentication invalidates its generation.
    A late-resolving decrypted value is never returned across that boundary.
+   A new session cannot attach until the previous asynchronous lock release
+   settles; lock release failure changes the gate to RECOVERY_REQUIRED.
    UI components MUST clear any already-rendered decrypted state on lock.
 4. Missing encrypted record returns `undefined` with no fallback.
    Cryptographic/session failure changes the session to
