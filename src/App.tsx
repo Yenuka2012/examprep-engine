@@ -7,6 +7,8 @@ import CatalogPanel from './CatalogPanel';
 import { completeActiveExam, createActiveExam, loadActiveExam, saveActiveExam } from './examPersistence';
 import { BookOpen, BookMarked, Upload, BarChart3, ShieldCheck, Download, Trash2, ArrowLeft, CheckCircle2, Clock3, Flag, Shuffle, Play } from 'lucide-react';
 import { db } from './db';
+import {withLegacyWritePermit} from './legacyWriteBarrier';
+import {jsonEqual} from './jsonEqual';
 import { isCorrect, shuffle, validateBank } from './logic';
 import { encryptBackup, type EncryptedBackup } from './crypto';
 import { decodeBackup, restoreBackup, requestPersistentStorage } from './recovery';
@@ -191,15 +193,39 @@ export default function App() {
       const imported=outcome.bank!;
       const existing=await db.banks.get(imported.bank_id);
       if(existing && !window.confirm('Replace existing bank '+imported.bank_id+'? Previously completed attempts are preserved.'))return;
-      await db.banks.put(imported);await reload();setSelectedBank(imported.bank_id);
+      // Check and write atomically while owning the source-wide permit.
+      // A second tab changing this bank after confirmation must fail closed.
+      await withLegacyWritePermit(()=>db.transaction('rw',db.banks,async()=>{
+        const current=await db.banks.get(imported.bank_id);
+        if(existing?!current||!jsonEqual(current,existing):!!current){
+          throw new Error('Question bank changed in another tab; import was not applied. Reload and retry.');
+        }
+        await db.banks.put(imported);
+      }));
+      await reload();setSelectedBank(imported.bank_id);
       setNotice('Imported '+imported.questions.length+' questions into '+imported.title);
       setPage('banks');
     }catch(e){setError(e instanceof SyntaxError?'Invalid JSON file':e instanceof Error?e.message:'Import failed');}
     finally{setBusy(false);}
   }
   async function deleteBank(id:string){
-    if(!window.confirm('Delete this local question bank? Completed attempts remain available.'))return;
-    await db.banks.delete(id);if(selectedBank===id)setSelectedBank('');await reload();
+    setError('');setNotice('');
+    try{
+      const observed=await db.banks.get(id);
+      if(!observed)return;
+      if(!window.confirm('Delete this local question bank? Completed attempts remain available.'))return;
+      await withLegacyWritePermit(()=>db.transaction('rw',db.banks,async()=>{
+        const current=await db.banks.get(id);
+        if(!current||!jsonEqual(current,observed)){
+          throw new Error('Question bank changed in another tab; delete was cancelled.');
+        }
+        await db.banks.delete(id);
+      }));
+      if(selectedBank===id)setSelectedBank('');
+      await reload();
+    }catch(e){
+      setError(e instanceof Error?e.message:'Bank deletion failed; no data was removed.');
+    }
   }
   async function startExam(){
     if(!bank||!eligible.length||!sessionLoaded||examAccess==='blocked'||examAccess==='checking')return;

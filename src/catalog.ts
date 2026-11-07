@@ -1,4 +1,5 @@
 import {db} from './db';
+import {withLegacyWritePermit} from './legacyWriteBarrier';
 import type {CertificationProfile,SyllabusDomain,SyllabusVersion} from './types';
 
 const IDENTIFIER=/^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/;
@@ -87,14 +88,14 @@ export function validateSyllabus(raw:unknown):SyllabusVersion{
 /** Add-only certification IDs prevent rebinding older question-bank metadata. */
 export async function addCertification(candidate:CertificationProfile):Promise<void>{
   const profile=validateCertification(candidate);
-  await db.certifications.add(profile);
+  await withLegacyWritePermit(()=>db.certifications.add(profile));
 }
 
 /** Draft writes use optimistic concurrency; published versions are immutable. */
 export async function saveSyllabusDraft(candidate:SyllabusVersion,expectedRevision?:number):Promise<void>{
   const value=validateSyllabus(candidate);
   if(value.status!=='draft')throw new Error('Only drafts can be edited');
-  await db.transaction('rw',db.certifications,db.syllabusVersions,async()=>{
+  await withLegacyWritePermit(()=>db.transaction('rw',db.certifications,db.syllabusVersions,async()=>{
     if(!await db.certifications.get(value.certificationId))throw new Error('Create the certification profile first');
     const old=await db.syllabusVersions.get(value.id);
     if(!old){
@@ -107,10 +108,10 @@ export async function saveSyllabusDraft(candidate:SyllabusVersion,expectedRevisi
       throw new Error('Draft was modified in another tab; reload before saving');
     }
     await db.syllabusVersions.put(value);
-  });
+  }));
 }
 export async function publishSyllabusVersion(key:string,expectedRevision:number):Promise<void>{
-  await db.transaction('rw',db.syllabusVersions,async()=>{
+  await withLegacyWritePermit(()=>db.transaction('rw',db.syllabusVersions,async()=>{
     const current=await db.syllabusVersions.get(key);
     if(!current||current.status!=='draft'||current.revision!==expectedRevision)throw new Error('Draft is missing, already published or changed; reload');
     const checked=validateSyllabus(current);
@@ -118,5 +119,5 @@ export async function publishSyllabusVersion(key:string,expectedRevision:number)
     const published: SyllabusVersion={...checked,status:'published',revision:checked.revision+1,
       updatedAt:now,publishedAt:now};
     await db.syllabusVersions.put(validateSyllabus(published));
-  });
+  }));
 }
