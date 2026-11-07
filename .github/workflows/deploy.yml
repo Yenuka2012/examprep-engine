@@ -178,6 +178,47 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+  # M2.4 S1-S3 cryptographic bridge: isolated localhost-only harness.
+  # Mandatory production gate; never package or publish dist-vault-test.
+  vault-bridge-browser-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f
+      options: --user 1001
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Reproducible dependency install
+        run: npm ci --no-fund
+      - name: Verify compiled vault harness isolation before browser tests
+        run: |
+          npm run build
+          test ! -e dist/vault-harness.html
+          if grep -R -l -E 'examprep-secure-vault-v1|SYNTHETIC-SECRET-QUESTION|SYNTHETIC-BACKUP-QUESTION' dist; then
+            echo 'Experimental vault leaked into production build' >&2
+            exit 1
+          fi
+          npm run build:vault-test
+          test -s dist-vault-test/vault-harness.html
+      - name: Run S1-S3 cryptographic owner, backup and no-fallback browser tests
+        run: npm run test:e2e:vault
+      - name: Preserve failing vault browser traces
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: vault-bridge-browser-failure
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
+          retention-days: 14
+
   codeql-gate:
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -204,7 +245,7 @@ jobs:
 
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    needs: [verify, browser-tests, source-barrier-browser-tests, mixed-version-browser-tests, codeql-gate]
+    needs: [verify, browser-tests, source-barrier-browser-tests, mixed-version-browser-tests, vault-bridge-browser-tests, codeql-gate]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment:
