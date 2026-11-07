@@ -57,9 +57,13 @@ test('unfinished exam blocks read-only audit when another tab holds exam owner l
   const other=await context.newPage();
   try{
     await other.goto(home);
+    // Exam recovery intentionally redirects non-owning tabs to the read-only
+    // exam view. Navigate back to the dashboard before invoking the audit.
+    await expect(other.getByText('Exam locked to another tab')).toBeVisible();
+    await other.getByRole('button',{name:'Dashboard'}).click();
     await audit(other);
     await expect(other.getByText(/Another tab owns the exam/)).toBeVisible();
-    await expect(other.getByText(/0 banks, /)).toHaveCount(0);
+    await expect(other.getByTestId('cutover-aggregate-counts')).toHaveCount(0);
     await expect(other.getByText(/Old cached tabs\/PWAs may still write/)).toBeVisible();
   }finally{await other.close();}
 });
