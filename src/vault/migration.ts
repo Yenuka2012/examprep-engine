@@ -225,6 +225,12 @@ export async function rehearseSyntheticMigration(
   options:SyntheticMigrationOptions={}
 ):Promise<MigrationResult>{
   if(!session.active)throw new Error('Unlock the experimental vault first');
+  // Synthetic ONLY: fail closed if a cooperating writer is already active.
+  // Hold this exclusive source lock for the *entire* snapshot, encrypted
+  // copy, authenticated journal checkpoint and final source read-back.
+  // This does not revoke any legacy examprep-v1 client or authorize cutover.
+  const releaseSourceFreeze=await source.freezeWrites();
+  try{
   const sourceSnapshot=await source.snapshot();
   const {items,fingerprint}=await fingerprintSyntheticSnapshot(sourceSnapshot);
   const journalRows=await session.listByType('migration-journal');
@@ -304,6 +310,11 @@ export async function rehearseSyntheticMigration(
     journalId,sourceFingerprint:fingerprint,records:items.length,
     resumedRecords,copiedRecords,status:'validated'
   };
+  }finally{
+    // A failed checkpoint, missing ciphertext or source change never leaves
+    // an abandoned exclusive synthetic source lock behind.
+    await releaseSourceFreeze();
+  }
 }
 
 /** Used only by synthetic fresh-profile restore regression to verify all data. */
