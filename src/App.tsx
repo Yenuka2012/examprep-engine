@@ -290,9 +290,18 @@ export default function App() {
     if(busy)return;
     setError('');setBusy(true);
     try{
-      const data={backup_version:2,exported_at:new Date().toISOString(),
-        banks:await db.banks.toArray(),attempts:await db.attempts.toArray(),
-        certifications:await db.certifications.toArray(),syllabi:await db.syllabusVersions.toArray()};
+      // Read all four exported stores in ONE consistent IndexedDB snapshot.
+      // Separate toArray() calls could observe different revisions when another
+      // tab edits banks/catalog/history during an encrypted export.
+      // Keep PBKDF2/AES-GCM *outside* the live IDB transaction (Safari).
+      const data=await db.transaction('r',
+        db.banks,db.attempts,db.certifications,db.syllabusVersions,
+        async()=>({
+          backup_version:2 as const,exported_at:new Date().toISOString(),
+          banks:await db.banks.toArray(),attempts:await db.attempts.toArray(),
+          certifications:await db.certifications.toArray(),syllabi:await db.syllabusVersions.toArray()
+        })
+      );
       const encrypted=await encryptBackup(data,backupPassphrase);
       saveEncryptedJson(encrypted,'examprep-ENCRYPTED-'+new Date().toISOString().slice(0,10)+'.json');
       setNotice('Encrypted backup exported. Keep the passphrase safe; it cannot be recovered.');
