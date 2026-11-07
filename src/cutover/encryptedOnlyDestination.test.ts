@@ -112,6 +112,43 @@ describe('M2.3 encrypted-only destination seam (NOT production integrated)',()=>
     await expect(gate.read(ID)).rejects.toThrow(/fallback is prohibited/);
     expect(()=>gate.attachVerifiedSession(session())).toThrow(/cannot be reattached/);
   });
+
+  it('denies a new session while the previous owner Web Lock is still releasing',async()=>{
+    let resolveLock:()=>void=()=>undefined;
+    let releaseStarted:()=>void=()=>undefined;
+    const started=new Promise<void>(resolve=>{releaseStarted=resolve;});
+    const owner={
+      active:true,
+      read:vi.fn(async()=>record()),
+      lock:vi.fn(async()=>{
+        releaseStarted();
+        await new Promise<void>(resolve=>{resolveLock=resolve;});
+      })
+    };
+    const gate=new EncryptedOnlyDestination();
+    gate.attachVerifiedSession(owner);
+    const releasing=gate.lock();
+    await started;
+    expect(gate.phase).toBe('LOCKED');
+    expect(()=>gate.attachVerifiedSession(session())).toThrow(/cannot be reattached/);
+    resolveLock();
+    await releasing;
+    gate.attachVerifiedSession(session());
+    expect(gate.phase).toBe('ENCRYPTED_ONLY');
+  });
+  it('fails closed on an unsuccessful owner lock release without permitting reattachment',async()=>{
+    const bad={
+      active:true,
+      read:vi.fn(async()=>record()),
+      lock:vi.fn(async()=>{throw new Error('PRIVATE owner Web Lock failure');})
+    };
+    const gate=new EncryptedOnlyDestination();
+    gate.attachVerifiedSession(bad);
+    await expect(gate.lock()).rejects.toThrow(/Recovery is required/);
+    expect(gate.phase).toBe('RECOVERY_REQUIRED');
+    expect(()=>gate.attachVerifiedSession(session())).toThrow(/cannot be reattached/);
+  });
+
   it('supports all five encrypted content types and never exposes verifier entries',async()=>{
     const allowed=['bank','attempt','active-session','certification','syllabus'];
     for(const kind of allowed){
