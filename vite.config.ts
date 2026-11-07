@@ -1,7 +1,7 @@
 import {defineConfig} from 'vite';
 import react from '@vitejs/plugin-react';
 import {VitePWA} from 'vite-plugin-pwa';
-const mixedCandidateBase = process.env.EXAMPREP_MIXED_CANDIDATE === '1' ? '/examprep-candidate/' : mixedCandidateBase;
+const mixedCandidateBase = process.env.EXAMPREP_MIXED_CANDIDATE === '1' ? '/examprep-candidate/' : '/examprep-engine/';
 export default defineConfig({
   plugins:[
     react(),
