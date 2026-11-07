@@ -1,4 +1,5 @@
 import {db} from './db';
+import {withLegacyWritePermit} from './legacyWriteBarrier';
 import type {Attempt,ExamSession} from './types';
 import {isCorrect} from './logic';
 import {validateExamSession} from './examValidation';
@@ -13,20 +14,20 @@ export async function loadActiveExam():Promise<ExamSession|null>{
 }
 export async function saveActiveExam(session:ExamSession):Promise<void>{
   validateExamSession(session);
-  await db.transaction('rw', db.activeSessions, async()=>{
+  await withLegacyWritePermit(()=>db.transaction('rw', db.activeSessions, async()=>{
     const stored=await db.activeSessions.get('current');
     if(!stored || stored.value.id!==session.id)throw new Error('Active exam has changed; refusing stale write');
     await db.activeSessions.put({key:'current',value:session});
-  });
+  }));
 }
 export async function createActiveExam(session:ExamSession):Promise<ExamSession>{
   validateExamSession(session);
-  return db.transaction('rw',db.activeSessions,async()=>{
+  return withLegacyWritePermit(()=>db.transaction('rw',db.activeSessions,async()=>{
     const stored=await db.activeSessions.get('current');
     if(stored) return validateExamSession(stored.value);
     await db.activeSessions.add({key:'current',value:session});
     return session;
-  });
+  }));
 }
 export async function completeActiveExam(session:ExamSession):Promise<Attempt>{
   validateExamSession(session);
@@ -38,7 +39,7 @@ export async function completeActiveExam(session:ExamSession):Promise<Attempt>{
     answers:session.answers,questionSnapshots:session.questions,
     correctCount,total:session.questions.length
   };
-  return db.transaction('rw',db.activeSessions,db.attempts,async()=>{
+  return withLegacyWritePermit(()=>db.transaction('rw',db.activeSessions,db.attempts,async()=>{
     const existing=await db.attempts.get(session.id);
     if(existing)return existing;
     const current=await db.activeSessions.get('current');
@@ -46,5 +47,5 @@ export async function completeActiveExam(session:ExamSession):Promise<Attempt>{
     await db.attempts.add(proposed);
     await db.activeSessions.delete('current');
     return proposed;
-  });
+  }));
 }
