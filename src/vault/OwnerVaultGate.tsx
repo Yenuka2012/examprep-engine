@@ -289,7 +289,7 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
       if(!session)throw new Error('Vault owner must unlock before migration rehearsal');
       session.touch();
       const result=await rehearseSyntheticMigration(
-        session,legacy,interrupt?{interruptAfterWriteBeforeCheckpoint:1}:{}
+        session,syntheticSource,interrupt?{interruptAfterWriteBeforeCheckpoint:1}:{}
       );
       if(generation===uiGenerationRef.current)setNotice('Synthetic migration validated: '+result.records+
         ' encrypted records; '+result.resumedRecords+' resumed, '+
