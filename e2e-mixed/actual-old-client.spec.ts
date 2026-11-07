@@ -97,9 +97,9 @@ test('inert native upgrade alone is no storage ACL: versionless writer still wor
   await newer.goto(NEW);
   await expect(newer.getByRole('heading',{name:'Overview'})).toBeVisible();
   expect(await nativeVersion(newer)).toBe(NATIVE_V3);
-  const nativeResult=await page.evaluate(async name=>{
+  const nativeResult=await page.evaluate(async ({name,version})=>{
     return new Promise<'upgraded'|'blocked'|'failed'>(resolve=>{
-      const request=indexedDB.open(name,PROBE_V4);
+      const request=indexedDB.open(name,version);
       let completed=false;
       const finish=(state:'upgraded'|'blocked'|'failed')=>{
         if(!completed){completed=true;resolve(state);}
@@ -115,7 +115,7 @@ test('inert native upgrade alone is no storage ACL: versionless writer still wor
       request.onsuccess=()=>{request.result.close();finish('upgraded');};
       request.onerror=()=>finish('failed');
     });
-  },LEGACY_DB);
+  },{name:LEGACY_DB,version:PROBE_V4});
   // Synthetic empty v30 source upgraded to 40, and the newer tab must
   // enter update-required mode after the versionchange notification.
   expect(nativeResult).toBe('upgraded');
