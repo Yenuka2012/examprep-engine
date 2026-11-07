@@ -66,7 +66,11 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
   }
   function sessionOptions(){
     return {idleMs,lockOnHidden,onLocked:()=>{
-      lockHadFailureRef.current=false;
+      // The encrypted-only destination fails closed on an invalid AES-GCM
+      // record, marks RECOVERY_REQUIRED, THEN invokes owner.lock(). Capture
+      // that state BEFORE redaction so its security error is never erased.
+      const recoveryRequired=destinationRef.current?.phase==='RECOVERY_REQUIRED';
+      lockHadFailureRef.current=recoveryRequired;
       // Hide the entire synthetic workspace synchronously even if React is
       // interrupted, then flush all React state changes before returning.
       document.documentElement.classList.add('vault-redacting');
@@ -74,8 +78,12 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
       flushSync(()=>{
         clearPrivateState();
         setLockDraining(true);
-        setError('');
-        setNotice('Vault locked. Accepted encrypted operations may still be settling; do not reload or clear storage.');
+        setError(recoveryRequired
+          ? 'Encrypted vault integrity or owner session failure. Recovery is required; plaintext fallback is prohibited.'
+          : '');
+        setNotice(recoveryRequired
+          ? 'Vault locked after an authentication failure. Verify encrypted recovery without clearing existing storage.'
+          : 'Vault locked. Accepted encrypted operations may still be settling; do not reload or clear storage.');
       });
       document.documentElement.classList.remove('vault-redacting');
     },onPendingFailure:()=>{
