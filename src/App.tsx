@@ -3,6 +3,7 @@ import { ExamLock } from './examLock';
 import { SessionSaveQueue } from './saveQueue';
 import {assertRestorableBackupSize,MAX_BACKUP_FILE_BYTES} from './backupSize';
 import PwaStatus from './PwaStatus';
+import CutoverReadinessPanel from './CutoverReadinessPanel';
 import CatalogPanel from './CatalogPanel';
 import { completeActiveExam, createActiveExam, loadActiveExam, saveActiveExam } from './examPersistence';
 import { BookOpen, BookMarked, Upload, BarChart3, ShieldCheck, Download, Trash2, ArrowLeft, CheckCircle2, Clock3, Flag, Shuffle, Play } from 'lucide-react';
@@ -362,6 +363,7 @@ export default function App() {
       {page==='dashboard'&&<div className="stack">
         <section className="hero"><div><span className="hero-kicker">READY WHEN YOU ARE</span><h2>Build confidence, one question at a time.</h2><p>Import your own JSON question banks, practise under exam conditions and follow your progress. All questions and results stay in this browser.</p><button className="primary" onClick={()=>setPage('banks')}>Manage question banks →</button></div><div className="hero-art"><BookOpen size={84}/></div></section>
         <section className="stats"><div className="stat"><span>Question banks</span><strong>{banks.length}</strong></div><div className="stat"><span>Questions available</span><strong>{totalQuestions}</strong></div><div className="stat"><span>Completed exams</span><strong>{attempts.length}</strong></div><div className="stat"><span>Average accuracy</span><strong>{pct(totalCorrect,totalAttempted)}%</strong></div></section>
+        <CutoverReadinessPanel />
         <section className="panel"><div className="sectionhead"><h3>Recent exam sessions</h3><button className="subtle" onClick={()=>setPage('analytics')}>View analytics →</button></div>{attempts.length===0?<p className="empty">No results yet. Import a question bank and take your first practice exam.</p>:<div className="records">{attempts.slice(0,5).map(a=><button className="record" key={a.id} onClick={()=>{setViewResult(a);setPage('exam');}}><div><strong>{a.certification} — {a.bankTitle}</strong><small>{formatDate(a.completedAt)} · {a.total} questions</small></div><strong>{pct(a.correctCount,a.total)}%</strong></button>)}</div>}</section>
       </div>}
       {page==='catalog'&&<CatalogPanel banks={banks}/>}
