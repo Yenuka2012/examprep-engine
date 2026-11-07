@@ -46,11 +46,12 @@ test('an encrypted export requires a passphrase and does not offer a plaintext d
   await page.goto('/examprep-engine/');
   await page.getByRole('button',{name:'Question Banks',exact:true}).click();
   await page.locator('input[type="file"]').first().setInputFiles('samples/demo-bank.json');
-  // The full-backup button has a substring-matching name but is disabled
-  // without a passphrase. Wait for the exact bank-export button to appear
-  // after its IndexedDB import transaction has committed.
-  await expect(page.getByRole('button',{name:'Export encrypted',exact:true})).toBeEnabled();
-  await page.getByRole('button',{name:'Export encrypted',exact:true}).click();
+  // Regression #76: a substring locator also matched the disabled full-backup
+  // button before the asynchronous bank import finished, causing WebKit timeout.
+  await expect(page.getByRole('button',{name:'Export encrypted backup'})).toBeDisabled();
+  const bankExport=page.getByRole('button',{name:'Export encrypted',exact:true});
+  await expect(bankExport).toBeEnabled();
+  await bankExport.click();
   await expect(page.getByText(/Enter a unique passphrase of at least 12 characters/)).toBeVisible();
   await expect(page.getByRole('button',{name:'Export',exact:true})).toHaveCount(0);
 });
