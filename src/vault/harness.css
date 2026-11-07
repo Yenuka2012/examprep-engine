@@ -12,3 +12,7 @@ body{font:16px/1.5 system-ui,-apple-system,sans-serif;margin:0;background:#10192
 .vault-harness button:disabled{opacity:.55;cursor:not-allowed}
 .vault-harness [role=alert]{color:#ffacac}
 .vault-harness [role=status]{overflow-wrap:anywhere}
+
+/* Synthetic harness only: pagehide/background UI is concealed synchronously,
+ * including during delayed React commits; do NOT deploy in the Pages build. */
+html.vault-redacting .vault-harness { visibility: hidden !important; }

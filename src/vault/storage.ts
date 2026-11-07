@@ -33,7 +33,10 @@ type SessionIO={
 };
 export type OwnerSessionOptions={
   idleMs?:number;
+  // Fired synchronously at lock initiation, before pending operations drain.
   onLocked?:()=>void;
+  // Sanitized notification after failed accepted operations; no sensitive values.
+  onPendingFailure?:()=>void;
   // Normal behavior always locks on background/pagehide. Synthetic tests may
   // verify coordination separately without changing production defaults.
   lockOnHidden?:boolean;
@@ -118,6 +121,7 @@ export class OwnerVaultSession {
   #io:SessionIO;
   #idleMs:number;
   #onLocked:(()=>void)|undefined;
+  #onPendingFailure:(()=>void)|undefined;
   #lockOnHidden:boolean;
   #visibility=()=>{
     if(document.visibilityState==='hidden'&&this.#lockOnHidden)void this.lock();
@@ -135,6 +139,7 @@ export class OwnerVaultSession {
       throw new Error('Invalid vault inactivity policy');
     }
     this.#onLocked=options.onLocked;
+    this.#onPendingFailure=options.onPendingFailure;
     this.#lockOnHidden=options.lockOnHidden!==false;
     if(typeof document!=='undefined'){
       document.addEventListener('visibilitychange',this.#visibility);
@@ -212,29 +217,46 @@ export class OwnerVaultSession {
     }
   }
   /**
-   * Stop new operations; allow already accepted writes to finish before
-   * releasing the exclusive lock, even when an individual write fails.
-   * A browser force-kill can still interrupt in-flight writes; caller must
-   * show save failures and validate durable persistence on re-open.
+   * Synchronous redaction / asynchronous durable I/O drain:
+   * 1. Deny all NEW operations and discard this session's DEK reference.
+   * 2. Notify the UI synchronously, before any await or background suspension.
+   * 3. Keep the exclusive owner Web Lock until accepted operations settle.
+   *
+   * Do not time out by releasing the lock: that permits concurrent writes
+   * while an accepted IndexedDB operation may still be in flight. A killed
+   * browser is a recovery/independent-backup scenario, not proof of commit.
+   * Already accepted operations captured the DEK when they started.
    */
   lock():Promise<void>{
     if(this.#closePromise)return this.#closePromise;
     this.#closing=true;
-    this.#closePromise=(async()=>{
+    this.#key=null;
+    if(this.#timer!==null){clearInterval(this.#timer);this.#timer=null;}
+    if(typeof document!=='undefined'){
+      document.removeEventListener('visibilitychange',this.#visibility);
+      window.removeEventListener('pagehide',this.#pagehide);
+      window.removeEventListener('pageshow',this.#pageshow);
+    }
+    const accepted=[...this.#pending];
+    // Install the idempotent close promise BEFORE invoking callbacks, so a
+    // synchronous callback cannot accidentally start a second lock release.
+    this.#closePromise=Promise.resolve().then(async()=>{
       try{
-        await Promise.allSettled([...this.#pending]);
-      }finally{
-        this.#key=null;
-        if(this.#timer!==null){clearInterval(this.#timer);this.#timer=null;}
-        if(typeof document!=='undefined'){
-          document.removeEventListener('visibilitychange',this.#visibility);
-          window.removeEventListener('pagehide',this.#pagehide);
-          window.removeEventListener('pageshow',this.#pageshow);
+        const settled=await Promise.allSettled(accepted);
+        if(settled.some(result=>result.status==='rejected')){
+          try{this.#onPendingFailure?.();}catch{
+            // A UI notification failure must not prevent releasing the lock.
+          }
         }
-        try{await this.#lock.release();}
-        finally{this.#onLocked?.();}
+      }finally{
+        await this.#lock.release();
       }
-    })();
+    });
+    try{this.#onLocked?.();}catch{
+      // Caller-supplied React redaction must be robust and synchronous.
+      // Even if it throws, NEVER leak the owner Web Lock or retain the DEK.
+      // The experimental UI separately starts with a synchronous concealment.
+    }
     return this.#closePromise;
   }
 }

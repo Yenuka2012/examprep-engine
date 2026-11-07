@@ -4,6 +4,7 @@
  * These are UI modes, not server-authenticated administrator roles.
  */
 import {useEffect,useMemo,useRef,useState} from 'react';
+import {flushSync} from 'react-dom';
 import {ExperimentalVaultRepository,type OwnerVaultSession} from './storage';
 import {type EncryptedOnlyDestination} from '../cutover/encryptedOnlyDestination';
 import {enrollEncryptedDestination,unlockEncryptedDestination,restoreEncryptedDestinationIntoEmpty} from './verifiedDestinationBridge';
@@ -16,6 +17,7 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
   const repository=useMemo(()=>new ExperimentalVaultRepository(),[]);
   const sessionRef=useRef<OwnerVaultSession|null>(null);
   const destinationRef=useRef<EncryptedOnlyDestination|null>(null);
+  const uiGenerationRef=useRef(0);
   const [phase,setPhase]=useState<'checking'|'setup'|'locked'|'unlocked'>('checking');
   const [master,setMaster]=useState('');
   const [recovery,setRecovery]=useState('');
@@ -49,15 +51,30 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
   },[repository]);
 
   function clearPrivateState(){
+    // A generation change invalidates any async UI continuation that started
+    // under a previous owner session, including late accepted saves/reads.
+    uiGenerationRef.current++;
     sessionRef.current=null;
     destinationRef.current=null;
-    setMaster('');setRecovery('');setPrivateNote('');setVisibleNote('');
-    setSavedRef(null);setWorkspace('Manage Content');
+    setMaster('');setRecovery('');setRestoreSecret('');setRestoreFile(null);
+    setPrivateNote('');setVisibleNote('');
+    setSavedRef(null);setWorkspace('Manage Content');setBusy(false);
     setPhase('locked');
   }
   function sessionOptions(){
     return {idleMs,lockOnHidden,onLocked:()=>{
-      clearPrivateState();setNotice('Vault locked; decrypted test data cleared from the interface.');
+      // Hide the entire synthetic workspace synchronously even if React is
+      // interrupted, then flush all React state changes before returning.
+      document.documentElement.classList.add('vault-redacting');
+      flushSync(()=>{
+        clearPrivateState();
+        setError('');
+        setNotice('Vault locked. Verify any previously pending encrypted save after re-unlock.');
+      });
+      document.documentElement.classList.remove('vault-redacting');
+    },onPendingFailure:()=>{
+      // No secrets/exception messages are used in this locked-state notice.
+      setNotice('A pending encrypted operation failed. Verify durable records and an independent backup before continuing.');
     }};
   }
   function report(error:unknown){
@@ -104,8 +121,10 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
       const session=sessionRef.current;
       if(!session)throw new Error('Owner vault must be unlocked');
       session.touch();
+      const generation=uiGenerationRef.current;
       const newRef=await session.save('bank',{kind:'synthetic-private-note',text:privateNote},
         savedRef?{recordId:savedRef.recordId,expectedNonce:savedRef.nonce}:{});
+      if(generation!==uiGenerationRef.current||sessionRef.current!==session||!session.active)return;
       setSavedRef(newRef);
       setNotice('Synthetic note saved as an encrypted record.');
       setVisibleNote('');
@@ -119,9 +138,11 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
       const session=sessionRef.current;
       if(!session||!savedRef)throw new Error('Read an existing synthetic record first');
       session.touch();
+      const generation=uiGenerationRef.current;
       await session.save('bank',{kind:'synthetic-private-note',text:'stale-write-must-not-commit'},{
         recordId:savedRef.recordId,expectedNonce:'synthetic-stale-nonce'
       });
+      if(generation!==uiGenerationRef.current||sessionRef.current!==session||!session.active)return;
       setError('Stale write was unexpectedly accepted');
     }catch(error){report(error);}
     finally{setBusy(false);}
@@ -133,7 +154,9 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
       const session=sessionRef.current;
       if(!session)throw new Error('Unlock owner vault before exporting');
       session.touch();
+      const generation=uiGenerationRef.current;
       const bundle=await session.exportBundle();
+      if(generation!==uiGenerationRef.current||sessionRef.current!==session||!session.active)return;
       const content=JSON.stringify(bundle);
       const file=new Blob([content],{type:'application/json'});
       if(file.size>MAX_VAULT_TRANSFER_BYTES){
@@ -181,13 +204,16 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
     try{
       const session=sessionRef.current;
       if(!session)throw new Error('Owner vault must be unlocked');
+      const generation=uiGenerationRef.current;
       session.touch();
-      const target=savedRef?.recordId??(await repository.encryptedRecords())
-        .find(record=>record.recordType==='bank')?.recordId;
+      const records=savedRef ? undefined : await repository.encryptedRecords();
+      if(generation!==uiGenerationRef.current||sessionRef.current!==session||!session.active)return;
+      const target=savedRef?.recordId??records?.find(record=>record.recordType==='bank')?.recordId;
       if(!target)throw new Error('No synthetic encrypted note exists');
       const destination=destinationRef.current;
       if(!destination)throw new Error('Encrypted-only destination is unavailable');
       const result=await destination.read(target);
+      if(generation!==uiGenerationRef.current||sessionRef.current!==session||!session.active)return;
       if(!result||result.recordType!=='bank'||!result.value||
          typeof result.value!=='object'||!('kind' in result.value)||
          result.value.kind!=='synthetic-private-note'||!('text' in result.value)||
