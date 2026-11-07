@@ -38,3 +38,25 @@ test('writer freeze denies mutation, release permits only synthetic source write
   const names=await page.evaluate(()=>indexedDB.databases());
   expect(names.map(entry=>entry.name)).not.toContain('examprep-v1');
 });
+
+
+test('migration itself fails closed while another synthetic source freeze is held, then resumes safely',async({page})=>{
+  await page.goto(origin);
+  await page.getByLabel('Master passphrase').fill(master);
+  await page.getByLabel('Separate recovery credential').fill(recovery);
+  await page.getByRole('button',{name:'Enroll encrypted vault'}).click();
+  await expect(page.getByRole('heading',{name:'Owner workspace'})).toBeVisible();
+  await page.getByRole('button',{name:'Seed synthetic legacy source'}).click();
+  await expect(page.getByText(/Synthetic legacy source seeded/)).toBeVisible();
+  await page.getByRole('button',{name:'Hold synthetic writer freeze'}).click();
+  await expect(page.getByText(/Exclusive synthetic writer freeze held/)).toBeVisible();
+  await page.getByRole('button',{name:'Resume synthetic migration'}).click();
+  await expect(page.getByRole('alert')).toContainText(/migration freeze is already held/i);
+  await page.getByRole('button',{name:'Release synthetic writer freeze'}).click();
+  await expect(page.getByText('Synthetic writer freeze released.')).toBeVisible();
+  await page.getByRole('button',{name:'Resume synthetic migration'}).click();
+  await expect(page.getByText(/Synthetic migration validated: 5 encrypted records; 0 resumed, 5 newly copied/)).toBeVisible();
+  // No real production browser DB is opened in this synthetic fixture.
+  const names=(await page.evaluate(()=>indexedDB.databases())).map(x=>x.name);
+  expect(names).not.toContain('examprep-v1');
+});
