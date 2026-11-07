@@ -19,6 +19,8 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
   const destinationRef=useRef<EncryptedOnlyDestination|null>(null);
   const uiGenerationRef=useRef(0);
   const lockHadFailureRef=useRef(false);
+  // Retain the accepted-operation drain after the UI loses all owner refs.
+  const pendingOwnerReleaseRef=useRef<Promise<void>|null>(null);
   const [phase,setPhase]=useState<'checking'|'setup'|'locked'|'unlocked'>('checking');
   const [master,setMaster]=useState('');
   const [recovery,setRecovery]=useState('');
@@ -45,10 +47,15 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
       mounted=false;
       const session=sessionRef.current;
       const destination=destinationRef.current;
+      const pendingRelease=pendingOwnerReleaseRef.current;
       sessionRef.current=null;
       destinationRef.current=null;
+      // Redaction intentionally erased public owner references immediately.
+      // Preserve its pending drain, otherwise Dexie.close() could abort an
+      // accepted write on React unmount/navigation.
       if(destination)void destination.lock().catch(()=>undefined).finally(()=>repository.close());
       else if(session)void session.lock().catch(()=>undefined).finally(()=>repository.close());
+      else if(pendingRelease)void pendingRelease.catch(()=>undefined).finally(()=>repository.close());
       else repository.close();
     };
   },[repository]);
@@ -70,6 +77,10 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
       // record, marks RECOVERY_REQUIRED, THEN invokes owner.lock(). Capture
       // that state BEFORE redaction so its security error is never erased.
       const recoveryRequired=destinationRef.current?.phase==='RECOVERY_REQUIRED';
+      // This is the SAME idempotent close promise already created by lock();
+      // keep it even after clearPrivateState() nulls the session references.
+      const owner=sessionRef.current;
+      if(owner)pendingOwnerReleaseRef.current=owner.lock();
       lockHadFailureRef.current=recoveryRequired;
       // Hide the entire synthetic workspace synchronously even if React is
       // interrupted, then flush all React state changes before returning.
@@ -91,6 +102,7 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
       lockHadFailureRef.current=true;
       setNotice('A pending encrypted operation or owner lock release failed. Verify durable records and an independent backup before continuing.');
     },onReleaseSettled:(released:boolean)=>{
+      pendingOwnerReleaseRef.current=null;
       setLockDraining(!released);
       if(!released)setError('Vault lock release could not be confirmed; preserve data and retry recovery.');
       else if(!lockHadFailureRef.current){
