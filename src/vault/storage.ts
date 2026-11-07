@@ -251,7 +251,6 @@ export class ExperimentalVaultRepository {
     masterSecret:string,recoverySecret:string,options:OwnerSessionOptions={}
   ):Promise<OwnerVaultSession>{
     const lock=await this.acquireOwnerLock();
-    let session:OwnerVaultSession|undefined;
     try{
       if(await this.db.headers.get('primary')||await this.db.records.count()){
         throw new Error('An experimental vault already exists; no data or credentials were overwritten');
@@ -270,10 +269,9 @@ export class ExperimentalVaultRepository {
         await this.db.headers.add({id:'primary',value:header,verifierId});
         await this.db.records.add({recordId:verifierId,envelope:verifier});
       });
-      session=new OwnerVaultSession(this.sessionIO(),key,lock,options);
-      return session;
+      return new OwnerVaultSession(this.sessionIO(),key,lock,options);
     }catch(error){
-      if(!session)await lock.release();
+      await lock.release();
       throw error;
     }
   }
@@ -281,7 +279,6 @@ export class ExperimentalVaultRepository {
     secret:string,method:'master'|'recovery'='master',options:OwnerSessionOptions={}
   ):Promise<OwnerVaultSession>{
     const lock=await this.acquireOwnerLock();
-    let session:OwnerVaultSession|undefined;
     try{
       const row=await this.db.headers.get('primary');
       if(!row)throw new Error('No experimental vault is enrolled');
@@ -299,10 +296,9 @@ export class ExperimentalVaultRepository {
          typeof checked.challenge!=='string'||checked.challenge.length<10){
         throw new Error('Vault key verification failed');
       }
-      session=new OwnerVaultSession(this.sessionIO(),key,lock,options);
-      return session;
+      return new OwnerVaultSession(this.sessionIO(),key,lock,options);
     }catch(error){
-      if(!session)await lock.release();
+      await lock.release();
       throw error;
     }
   }
@@ -319,7 +315,6 @@ export class ExperimentalVaultRepository {
     options:OwnerSessionOptions={}
   ):Promise<OwnerVaultSession>{
     const lock=await this.acquireOwnerLock();
-    let session:OwnerVaultSession|undefined;
     try{
       if(await this.db.headers.count()||await this.db.records.count()){
         throw new Error('Recovery requires an empty vault; existing encrypted records were preserved');
@@ -337,10 +332,9 @@ export class ExperimentalVaultRepository {
           recordId:envelope.recordId,envelope
         })));
       });
-      session=new OwnerVaultSession(this.sessionIO(),key,lock,options);
-      return session;
+      return new OwnerVaultSession(this.sessionIO(),key,lock,options);
     }catch(error){
-      if(!session)await lock.release();
+      await lock.release();
       throw error;
     }
   }
