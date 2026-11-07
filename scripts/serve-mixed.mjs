@@ -4,7 +4,8 @@
  * Never use a production origin or owner profile.
  */
 import {createServer} from 'node:http';
-import {readFile,stat} from 'node:fs/promises';
+import {open} from 'node:fs/promises';
+import {constants} from 'node:fs';
 import {resolve,relative,isAbsolute,extname} from 'node:path';
 
 const oldRoot=resolve('.mixed-old/dist');
@@ -42,15 +43,21 @@ createServer(async(req,res)=>{
     if(rel==='..'||rel.startsWith('../')||isAbsolute(rel)){
       res.writeHead(403);res.end();return;
     }
-    const entry=await stat(target);
-    if(!entry.isFile()){res.writeHead(404);res.end();return;}
-    const bytes=await readFile(target);
-    res.writeHead(200,{
-      'Content-Type':mime[extname(target)]||'application/octet-stream',
-      'Content-Length':bytes.byteLength,'Cache-Control':'no-store',
-      'X-Content-Type-Options':'nosniff'
-    });
-    res.end(req.method==='HEAD'?undefined:bytes);
+    // Open once with O_NOFOLLOW: never stat one path and read a different
+    // object after an attacker-controlled filesystem change (CodeQL TOCTOU).
+    // The CI artifacts are trusted build outputs, and the server is loopback only.
+    const fd=await open(target,constants.O_RDONLY|constants.O_NOFOLLOW);
+    try{
+      const bytes=await fd.readFile(); // EISDIR/non-file read fails closed
+      res.writeHead(200,{
+        'Content-Type':mime[extname(target)]||'application/octet-stream',
+        'Content-Length':bytes.byteLength,'Cache-Control':'no-store',
+        'X-Content-Type-Options':'nosniff'
+      });
+      res.end(req.method==='HEAD'?undefined:bytes);
+    }finally{
+      await fd.close();
+    }
   }catch{res.writeHead(404);res.end();}
 }).listen(4199,'127.0.0.1',()=>{
   process.stdout.write('Ephemeral mixed-build server ready on localhost port 4199\n');
