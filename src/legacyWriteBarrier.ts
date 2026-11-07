@@ -9,6 +9,9 @@
  * Web Locks are per origin, not per GitHub Pages repository pathname.
  * No localStorage-based ownership lease or silent unlocked fallback.
  */
+import {db} from './db';
+import {assertStorageWriteCompatible} from './storageVersionGuard';
+
 export const LEGACY_SOURCE_WRITE_LOCK='examprep-v03-source-write-barrier';
 
 export async function withLegacyWritePermit<T>(write:()=>Promise<T>):Promise<T>{
@@ -23,6 +26,11 @@ export async function withLegacyWritePermit<T>(write:()=>Promise<T>):Promise<T>{
       }
       // Callback includes the complete IndexedDB transaction and commit;
       // the permit releases on either successful completion or rejection.
+      // Dexie 4 may dynamically adapt to an upgraded native IDB version.
+      // This explicit check makes UPDATED writers fail closed; it cannot
+      // revoke uncooperative historical bundles or native versionless opens.
+      await db.open();
+      assertStorageWriteCompatible(db.backendDB()?.version);
       return write();
     }
   );

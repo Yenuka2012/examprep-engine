@@ -129,6 +129,55 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+
+  # Additional mandatory release gate: actual pre-barrier production bundle,
+  # not a mocked old writer. Both builds run on ONE isolated localhost origin.
+  mixed-version-browser-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f
+      options: --user 1001
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Build candidate in separate test-only PWA path
+        run: |
+          npm ci --no-fund
+          npm run build -- --mode mixed-cutover --outDir dist-mixed-candidate
+      - name: Build exact historical v0.3.0 pre-Web-Lock SHA
+        run: |
+          OLD_SHA=bcea4dc48612641458c0de3a97b3e519470664c3
+          git merge-base --is-ancestor "$OLD_SHA" HEAD
+          mkdir -p .mixed-old/source
+          git archive "$OLD_SHA" | tar -x -C .mixed-old/source
+          test ! -e .mixed-old/source/src/legacyWriteBarrier.ts
+          cd .mixed-old/source
+          npm ci --no-fund
+          npm run build
+          cd ../..
+          mv .mixed-old/source/dist .mixed-old/dist
+          test -s .mixed-old/dist/index.html
+          test -s dist-mixed-candidate/index.html
+      - name: Real bundle mixed-version Chromium/WebKit/iPhone/iPad regression
+        run: npm run test:e2e:mixed
+      - name: Retain mixed-version failure diagnostics
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: mixed-version-browser-failure
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
+          retention-days: 14
+
   codeql-gate:
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -155,7 +204,7 @@ jobs:
 
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    needs: [verify, browser-tests, source-barrier-browser-tests, codeql-gate]
+    needs: [verify, browser-tests, source-barrier-browser-tests, mixed-version-browser-tests, codeql-gate]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment:
