@@ -1,8 +1,9 @@
 import {defineConfig} from 'vite';
 import react from '@vitejs/plugin-react';
 import {VitePWA} from 'vite-plugin-pwa';
-const mixedCandidateBase = process.env.EXAMPREP_MIXED_CANDIDATE === '1' ? '/examprep-candidate/' : '/examprep-engine/';
-export default defineConfig({
+export default defineConfig(({mode})=>{
+  const mixedCandidateBase = mode==='mixed-cutover' ? '/examprep-candidate/' : '/examprep-engine/';
+  return {
   plugins:[
     react(),
     VitePWA({
@@ -32,4 +33,5 @@ export default defineConfig({
   ],
   base:mixedCandidateBase,
   build:{outDir:'dist',sourcemap:false}
+};
 });
