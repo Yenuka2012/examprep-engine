@@ -150,7 +150,7 @@ jobs:
       - name: Build candidate in separate test-only PWA path
         run: |
           npm ci --no-fund
-          EXAMPREP_MIXED_CANDIDATE=1 npm run build -- --outDir dist-mixed-candidate
+          npm run build -- --mode mixed-cutover --outDir dist-mixed-candidate
       - name: Build exact historical v0.3.0 pre-Web-Lock SHA
         run: |
           OLD_SHA=bcea4dc48612641458c0de3a97b3e519470664c3
