@@ -245,6 +245,9 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
         onChange={event=>setMaster(event.target.value)} /></label>
       <button disabled={busy||!master} onClick={()=>void unlock()}>Unlock encrypted vault</button>
     </section>}
+    {phase==='unlocked'&&<p data-testid="encrypted-destination-phase" role="status">
+      Encrypted-only destination: {destinationRef.current?.phase??'RECOVERY_REQUIRED'}
+    </p>}
     {phase==='unlocked'&&<section aria-label="Unlocked experimental vault">
       <h2>Owner workspace</h2>
       <p>Owner unlock active. Workspace selection is not RBAC.</p>
