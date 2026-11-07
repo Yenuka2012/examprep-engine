@@ -32,6 +32,8 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
   const [error,setError]=useState('');
   const [notice,setNotice]=useState('');
   const [busy,setBusy]=useState(false);
+  const [lockDraining,setLockDraining]=useState(false);
+
 
   useEffect(()=>{
     let mounted=true;
@@ -66,15 +68,20 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
       // Hide the entire synthetic workspace synchronously even if React is
       // interrupted, then flush all React state changes before returning.
       document.documentElement.classList.add('vault-redacting');
+      // If flushSync throws, concealment is intentionally retained.
       flushSync(()=>{
         clearPrivateState();
+        setLockDraining(true);
         setError('');
-        setNotice('Vault locked. Verify any previously pending encrypted save after re-unlock.');
+        setNotice('Vault locked. Accepted encrypted operations may still be settling; do not reload or clear storage.');
       });
       document.documentElement.classList.remove('vault-redacting');
     },onPendingFailure:()=>{
       // No secrets/exception messages are used in this locked-state notice.
-      setNotice('A pending encrypted operation failed. Verify durable records and an independent backup before continuing.');
+      setNotice('A pending encrypted operation or owner lock release failed. Verify durable records and an independent backup before continuing.');
+    },onReleaseSettled:(released:boolean)=>{
+      setLockDraining(!released);
+      if(!released)setError('Vault lock release could not be confirmed; preserve data and retry recovery.');
     }};
   }
   function report(error:unknown){
@@ -110,12 +117,13 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
     try{
       if(destinationRef.current)await destinationRef.current.lock();
       else await sessionRef.current?.lock();
-      clearPrivateState();
+      // State was already redacted synchronously by onLocked.
       setNotice('Vault locked.');
     }catch(error){report(error);}
     finally{setBusy(false);}
   }
   async function save(){
+    const startingGeneration=uiGenerationRef.current;
     setError('');setNotice('');setBusy(true);
     try{
       const session=sessionRef.current;
@@ -129,10 +137,14 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
       setNotice('Synthetic note saved as an encrypted record.');
       setVisibleNote('');
       setPrivateNote('');
-    }catch(error){report(error);}
-    finally{setBusy(false);}
+     }catch(error){
+      if(startingGeneration===uiGenerationRef.current)report(error);
+    }finally{
+      if(startingGeneration===uiGenerationRef.current)setBusy(false);
+    }
   }
   async function attemptStaleSave(){
+    const startingGeneration=uiGenerationRef.current;
     setError('');setNotice('');setBusy(true);
     try{
       const session=sessionRef.current;
@@ -144,11 +156,15 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
       });
       if(generation!==uiGenerationRef.current||sessionRef.current!==session||!session.active)return;
       setError('Stale write was unexpectedly accepted');
-    }catch(error){report(error);}
-    finally{setBusy(false);}
+     }catch(error){
+      if(startingGeneration===uiGenerationRef.current)report(error);
+    }finally{
+      if(startingGeneration===uiGenerationRef.current)setBusy(false);
+    }
   }
   async function exportPortableBackup(){
     if(busy)return;
+    const startingGeneration=uiGenerationRef.current;
     setError('');setNotice('');setBusy(true);
     try{
       const session=sessionRef.current;
@@ -174,8 +190,11 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
         window.setTimeout(()=>URL.revokeObjectURL(url),10_000);
       }
       setNotice('Encrypted vault transfer prepared. Restore in a clean profile to verify recovery.');
-    }catch(error){report(error);}
-    finally{setBusy(false);}
+     }catch(error){
+      if(startingGeneration===uiGenerationRef.current)report(error);
+    }finally{
+      if(startingGeneration===uiGenerationRef.current)setBusy(false);
+    }
   }
   async function importIntoEmptyVault(){
     if(busy)return;
@@ -200,6 +219,7 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
     }
   }
   async function read(){
+    const startingGeneration=uiGenerationRef.current;
     setError('');setNotice('');setBusy(true);
     try{
       const session=sessionRef.current;
@@ -224,8 +244,11 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
       setVisibleNote(result.value.text);
       setPrivateNote(result.value.text);
       setNotice('Synthetic record authenticated and decrypted.');
-    }catch(error){report(error);}
-    finally{setBusy(false);}
+     }catch(error){
+      if(startingGeneration===uiGenerationRef.current)report(error);
+    }finally{
+      if(startingGeneration===uiGenerationRef.current)setBusy(false);
+    }
   }
 
   return <main className="vault-harness">
@@ -269,7 +292,8 @@ export default function OwnerVaultGate({idleMs,lockOnHidden}:{
       </select></label>
       <label>Credential <input type="password" autoComplete="current-password" value={master}
         onChange={event=>setMaster(event.target.value)} /></label>
-      <button disabled={busy||!master} onClick={()=>void unlock()}>Unlock encrypted vault</button>
+      <button disabled={busy||lockDraining||!master} onClick={()=>void unlock()}>Unlock encrypted vault</button>
+      {lockDraining&&<p role="status">Finishing accepted encrypted operations before another unlock is permitted.</p>}
     </section>}
     {phase==='unlocked'&&<p data-testid="encrypted-destination-phase" role="status">
       Encrypted-only destination: {destinationRef.current?.phase??'RECOVERY_REQUIRED'}

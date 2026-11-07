@@ -37,6 +37,9 @@ export type OwnerSessionOptions={
   onLocked?:()=>void;
   // Sanitized notification after failed accepted operations; no sensitive values.
   onPendingFailure?:()=>void;
+  // Called only after pending operations settle and lock release completes.
+  // false signals failed lock release; do not assume durable recovery.
+  onReleaseSettled?:(released:boolean)=>void;
   // Normal behavior always locks on background/pagehide. Synthetic tests may
   // verify coordination separately without changing production defaults.
   lockOnHidden?:boolean;
@@ -122,12 +125,18 @@ export class OwnerVaultSession {
   #idleMs:number;
   #onLocked:(()=>void)|undefined;
   #onPendingFailure:(()=>void)|undefined;
+  #onReleaseSettled:((released:boolean)=>void)|undefined;
   #lockOnHidden:boolean;
   #visibility=()=>{
-    if(document.visibilityState==='hidden'&&this.#lockOnHidden)void this.lock();
+    if(document.visibilityState==='hidden'&&this.#lockOnHidden)void this.lock().catch(()=>{
+      // Browser background callbacks cannot await lock settlement; the UI
+      // remains redacted. An explicit unlocked recovery is required.
+    });
     else if(document.visibilityState==='visible')this.checkIdle();
   };
-  #pagehide=()=>{void this.lock();};
+  #pagehide=()=>{void this.lock().catch(()=>{
+    // Browser pagehide cannot await asynchronous release; never unlock UI.
+  });};
   #pageshow=()=>{this.checkIdle();};
 
   constructor(io:SessionIO,key:CryptoKey,lock:OwnerVaultLock,options:OwnerSessionOptions={}){
@@ -140,6 +149,7 @@ export class OwnerVaultSession {
     }
     this.#onLocked=options.onLocked;
     this.#onPendingFailure=options.onPendingFailure;
+    this.#onReleaseSettled=options.onReleaseSettled;
     this.#lockOnHidden=options.lockOnHidden!==false;
     if(typeof document!=='undefined'){
       document.addEventListener('visibilitychange',this.#visibility);
@@ -163,12 +173,12 @@ export class OwnerVaultSession {
     // the owner Web Lock before the inactivity deadline.
     if(!this.#closing&&this.#key&&
        (!this.#lock.owned||Date.now()-this.#lastActivity>=this.#idleMs)){
-      void this.lock();
+      void this.lock().catch(()=>undefined);
     }
   }
   #assertOpen(){
     if(Date.now()-this.#lastActivity>=this.#idleMs){
-      void this.lock();
+      void this.lock().catch(()=>undefined);
       throw new Error('Vault session expired');
     }
     if(!this.#key||this.#closing||!this.#lock.owned){
@@ -184,7 +194,15 @@ export class OwnerVaultSession {
   read(recordId:string):Promise<VaultRecordRead|undefined>{
     this.#assertOpen();
     const key=this.#key!;
-    return this.#track(this.#io.read(key,recordId,()=>this.#lock.owned));
+    // Never deliver a decrypted read that completes after pagehide/lock,
+    // even to a caller that does not use the encrypted-only destination.
+    return this.#track((async()=>{
+      const result=await this.#io.read(key,recordId,()=>this.#lock.owned);
+      if(this.#closing||!this.#lock.owned){
+        throw new Error('Vault locked before encrypted read completed');
+      }
+      return result;
+    })());
   }
   /**
    * Revision token is the previous authenticated nonce. Existing records
@@ -249,7 +267,20 @@ export class OwnerVaultSession {
           }
         }
       }finally{
-        await this.#lock.release();
+        let released=false;
+        try{
+          await this.#lock.release();
+          released=true;
+        }catch{
+          try{this.#onPendingFailure?.();}catch{
+            // Sanitized failure signaling cannot prevent session redaction.
+          }
+          throw new Error('Encrypted vault lock release failed; recovery required');
+        }finally{
+          try{this.#onReleaseSettled?.(released);}catch{
+            // UI callback faults do not rethrow into background event handlers.
+          }
+        }
       }
     });
     try{this.#onLocked?.();}catch{
