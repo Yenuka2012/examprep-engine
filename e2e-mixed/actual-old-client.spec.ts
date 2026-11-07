@@ -188,6 +188,46 @@ test('blocked native upgrade fails closed and aborts when subsequently unblocked
   },{name:LEGACY_DB});
   expect(result).toEqual({blocked:true,aborted:true,version:NATIVE_V3,record:true});
 });
+
+test('active updated exam becomes visibly read-only after external schema change, with session preserved',async({context,page})=>{
+  await page.goto(NEW);
+  await oldImport(page,'ACTIVE-VERSION-GUARD','In-flight exam preservation');
+  await page.getByRole('button',{name:'Practise'}).first().click();
+  await page.getByRole('button',{name:'Start examination'}).click();
+  await expect(page.getByText('Exam progress saved locally.')).toBeVisible();
+  const probe=await context.newPage();
+  try{
+    await probe.goto(PROBE);
+    const upgrade=await probe.evaluate(async name=>{
+      return new Promise<'done'|'blocked'|'error'>(resolve=>{
+        const req=indexedDB.open(name,40);
+        req.onblocked=()=>resolve('blocked');
+        req.onsuccess=()=>{req.result.close();resolve('done');};
+        req.onerror=()=>resolve('error');
+      });
+    },LEGACY_DB);
+    expect(upgrade).toBe('done');
+    await expect(page.getByRole('alert',{name:'Exam storage compatibility read-only'})).toBeVisible();
+    await expect(page.getByRole('button',{name:'Flag'})).toHaveCount(0);
+    await expect(page.getByText(/recent changes may not be durably saved/)).toBeVisible();
+    const preserved=await probe.evaluate(async name=>{
+      return new Promise<boolean>((resolve,reject)=>{
+        const open=indexedDB.open(name);
+        open.onerror=()=>reject(open.error);
+        open.onsuccess=()=>{
+          const db=open.result,tx=db.transaction('activeSessions','readonly');
+          const req=tx.objectStore('activeSessions').get('current');
+          req.onsuccess=()=>resolve(!!req.result);
+          req.onerror=()=>reject(req.error);
+          tx.oncomplete=()=>db.close();
+        };
+      });
+    },LEGACY_DB);
+    expect(preserved).toBe(true);
+    expect(await nativeVersion(probe)).toBe(PROBE_V4);
+  }finally{await probe.close();}
+});
+
 test('real historical PWA can reopen offline and mutate while newer tab holds lock',async({page,context})=>{
   await page.goto(OLD);
   await page.waitForFunction(async()=>{
