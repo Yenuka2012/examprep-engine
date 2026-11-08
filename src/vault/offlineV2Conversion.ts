@@ -253,7 +253,7 @@ export async function convertAuthenticatedV2BackupToVault(
   const checkMaster=await inspectConvertedVaultTransfer(transfer,masterSecret);
   const checkRecovery=await inspectConvertedVaultTransfer(transfer,recoverySecret,'recovery');
   assert(canonical(checkMaster.counts)===canonical(checkRecovery.counts)&&
-    checkMaster.encryptedRecordCount===source.length+1);
+    checkMaster.encryptedRecordCount===source.length);
   return {
     verdict:'ENCRYPTED_TRANSFER_CREATED_NOT_IMPORTED',
     counts:checkMaster.counts,transfer

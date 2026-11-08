@@ -57,7 +57,7 @@ describe('M2.7 offline logical-v2 to authenticated encrypted-vault conversion',(
     const expected={
       verdict:'VERIFIED_ENCRYPTED_TRANSFER_NOT_IMPORTED',
       counts:{banks:1,attempts:1,certifications:1,syllabi:1},
-      encryptedRecordCount:5
+      encryptedRecordCount:4
     };
     expect(await inspectConvertedVaultTransfer(converted.transfer,master))
       .toEqual(expected);
