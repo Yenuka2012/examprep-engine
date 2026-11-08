@@ -15,7 +15,9 @@ import {jsonEqual} from './jsonEqual';
 import { isCorrect, shuffle, validateBank } from './logic';
 import { encryptBackup, type EncryptedBackup } from './crypto';
 import { decodeBackup, restoreBackup, requestPersistentStorage } from './recovery';
-import type { Attempt, ExamSession, QuestionBank } from './types';
+import type { Attempt, ExamSession, QuestionBank, CertificationProfile } from './types';
+import BackupSafetyGuide from './BackupSafetyGuide';
+import {filterQuestionBanks,filterAttemptHistory,weakestDomains,attemptReview,type ScoreBand} from './learningInsights';
 import {EXAM_PRESETS,examOverview,navigatorItems,examTimeNotice,submissionReview,type NavigatorFilter} from './examUx';
 
 type Page = 'dashboard' | 'banks' | 'catalog' | 'exam' | 'analytics';
@@ -58,9 +60,26 @@ export default function App() {
   const [backupPassphrase,setBackupPassphrase]=useState('');
   const [persistenceStatus,setPersistenceStatus]=useState<'unknown'|'granted'|'denied'|'unsupported'>('unknown');
   const [now,setNow]=useState(Date.now());
+  const [catalogProfiles,setCatalogProfiles]=useState<CertificationProfile[]>([]);
+  const [bankQuery,setBankQuery]=useState('');
+  const [bankCertFilter,setBankCertFilter]=useState('ALL');
+  const [bankDomainFilter,setBankDomainFilter]=useState('ALL');
+  const [historyCertFilter,setHistoryCertFilter]=useState('ALL');
+  const [historyScoreFilter,setHistoryScoreFilter]=useState<ScoreBand>('all');
+  const [historyDateFrom,setHistoryDateFrom]=useState('');
+  const [historyDateTo,setHistoryDateTo]=useState('');
 
   async function reload(){setBanks(await db.banks.toArray());setAttempts((await db.attempts.toArray()).sort((a,b)=>b.completedAt.localeCompare(a.completedAt)));}
   useEffect(()=>{void reload().catch(()=>setError('Local database cannot be opened. Check browser storage settings.'));},[]);
+  // Read-only vendor search metadata, refreshed when returning from Catalog.
+  useEffect(()=>{
+    if(page!=='banks')return;
+    let mounted=true;
+    void db.certifications.toArray().then(items=>{
+      if(mounted)setCatalogProfiles(items);
+    }).catch(()=>undefined);
+    return()=>{mounted=false;};
+  },[page]);
   useEffect(()=>{
     let mounted=true;
     const lock=examLock.current;
@@ -352,6 +371,21 @@ export default function App() {
     }
     return [...m].map(([name,s])=>({name,...s})).sort((a,b)=>a.name.localeCompare(b.name));
   },[attempts]);
+  const bankCertifications=useMemo(()=>
+    [...new Set(banks.map(item=>item.certification))].sort(),[banks]);
+  const bankDomains=useMemo(()=>
+    [...new Set(banks.flatMap(item=>item.questions.map(q=>q.domain)))].sort(),[banks]);
+  const filteredBanks=useMemo(()=>filterQuestionBanks(banks,{
+    query:bankQuery,certification:bankCertFilter,domain:bankDomainFilter
+  },catalogProfiles),[banks,bankQuery,bankCertFilter,bankDomainFilter,catalogProfiles]);
+  const historyCertifications=useMemo(()=>
+    [...new Set(attempts.map(item=>item.certification))].sort(),[attempts]);
+  const filteredHistory=useMemo(()=>filterAttemptHistory(attempts,{
+    certification:historyCertFilter,score:historyScoreFilter,
+    fromDate:historyDateFrom,toDate:historyDateTo
+  }),[attempts,historyCertFilter,historyScoreFilter,historyDateFrom,historyDateTo]);
+  const weakDomainPriorities=useMemo(()=>weakestDomains(domainStats),[domainStats]);
+  const resultBreakdown=useMemo(()=>viewResult?attemptReview(viewResult):null,[viewResult]);
   return <div className="app">
     <aside className="sidebar">
       <div className="brand"><BookOpen size={26}/><div><strong>ExamPrep</strong><span>PERSONAL ENGINE</span></div></div>
@@ -377,12 +411,80 @@ export default function App() {
       {page==='catalog'&&<CatalogPanel banks={banks}/>}
       {page==='banks'&&<div className="stack">
         <section className="panel"><div className="sectionhead"><div><h3>Import a JSON question bank</h3><p className="muted">Validated locally. Files never leave your browser.</p></div><Upload size={24}/></div><label className="upload"><input type="file" accept=".json,application/json" disabled={busy} onChange={e=>{void importFile(e.target.files?.[0]);e.currentTarget.value='';}}/><Upload size={26}/><strong>{busy?'Importing…':'Choose a JSON file'}</strong><small>Maximum 5 MiB · Schema v1.0 · Up to 10,000 questions</small></label><p className="muted">Try the provided sample at <code>samples/demo-bank.json</code>. The importer rejects invalid answer keys, duplicate IDs and unsupported question types.</p></section>
-        <section className="panel"><div className="sectionhead"><h3>Imported banks</h3><span className="tag">{banks.length} banks</span></div>{banks.length===0?<p className="empty">No question banks imported yet.</p>:<div className="bankgrid">{banks.map(b=><div className="bankcard" key={b.bank_id}><span className="pill">{b.certification}</span><h4>{b.title}</h4><p>{b.questions.length} questions · {[...new Set(b.questions.map(q=>q.domain))].length} domains</p><div className="actions"><button className="primary small" onClick={()=>{setSelectedBank(b.bank_id);setDomain('ALL');setViewResult(null);setPage('exam');}}>Practise</button><button className="subtle small" disabled={busy} onClick={()=>void exportBankEncrypted(b)}><Download size={15}/> Export encrypted</button><button className="danger small" aria-label={'Delete '+b.title} onClick={()=>void deleteBank(b.bank_id)}><Trash2 size={15}/></button></div></div>)}</div>}</section>
-        <section className="panel"><div className="sectionhead"><h3>Data portability</h3><ShieldCheck size={20}/></div><p className="muted">All question-bank exports and full backups (including certification catalog metadata) are encrypted with AES-256-GCM. Enter the passphrase here before either export; it is never stored. Losing it means losing access to the backup. Browser IndexedDB remains unencrypted.</p><label className="backup-passphrase">Backup passphrase (at least 12 characters)<input autoComplete="new-password" type="password" value={backupPassphrase} onChange={e=>setBackupPassphrase(e.target.value)} placeholder="Enter a strong unique passphrase" /></label><div className="actions"><button className="secondary" disabled={backupPassphrase.length<12||busy} onClick={()=>void backup()}><Download size={16}/> Export encrypted backup</button><label className="buttonlike">Restore encrypted or legacy backup<input hidden type="file" disabled={busy} accept=".json,application/json" onChange={e=>{void restore(e.target.files?.[0]);e.currentTarget.value='';}}/></label><button className="secondary" disabled={busy} onClick={()=>void enablePersistentStorage()}>Request persistent storage</button></div><p className="muted">Restore is merge-only: existing records are never silently replaced. Legacy plaintext backup files are accepted only after explicit warning. Browser storage persistence: {persistenceStatus}. Active exams are excluded from backup; complete the exam first.</p></section>
+        <section className="panel">
+          <div className="sectionhead"><h3>Imported banks</h3>
+            <span className="tag">{filteredBanks.length} of {banks.length} banks</span>
+          </div>
+          {banks.length===0?<p className="empty">No question banks imported yet.</p>:<>
+            <div className="filtergrid" aria-label="Question-bank search and filters">
+              <label>Search title, certification, provider or domain
+                <input aria-label="Search question banks" type="search"
+                  value={bankQuery} onChange={e=>setBankQuery(e.target.value)}
+                  placeholder="Search question banks"/>
+              </label>
+              <label>Certification
+                <select aria-label="Filter banks by certification"
+                  value={bankCertFilter} onChange={e=>setBankCertFilter(e.target.value)}>
+                  <option value="ALL">All certifications</option>
+                  {bankCertifications.map(item=><option key={item} value={item}>{item}</option>)}
+                </select>
+              </label>
+              <label>Domain
+                <select aria-label="Filter banks by domain" value={bankDomainFilter}
+                  onChange={e=>setBankDomainFilter(e.target.value)}>
+                  <option value="ALL">All domains</option>
+                  {bankDomains.map(item=><option key={item} value={item}>{item}</option>)}
+                </select>
+              </label>
+            </div>
+            {filteredBanks.length===0?<p className="empty" role="status">
+              No question banks match these filters. Clear the search or select All.
+            </p>:<div className="bankgrid">{filteredBanks.map(b=><div className="bankcard" key={b.bank_id}>
+              <span className="pill">{b.certification}</span><h4>{b.title}</h4>
+              <p>{b.questions.length} questions · {[...new Set(b.questions.map(q=>q.domain))].length} domains</p>
+              <div className="actions">
+                <button className="primary small" onClick={()=>{
+                  setSelectedBank(b.bank_id);setDomain('ALL');setViewResult(null);setPage('exam');
+                }}>Practise</button>
+                <button className="subtle small" disabled={busy} onClick={()=>void exportBankEncrypted(b)}>
+                  <Download size={15}/> Export encrypted</button>
+                <button className="danger small" aria-label={'Delete '+b.title}
+                  onClick={()=>void deleteBank(b.bank_id)}><Trash2 size={15}/></button>
+              </div>
+            </div>)}</div>}
+          </>}
+        </section>
+        <section className="panel"><div className="sectionhead"><h3>Data portability</h3><ShieldCheck size={20}/></div><p className="muted">All question-bank exports and full backups (including certification catalog metadata) are encrypted with AES-256-GCM. Enter the passphrase here before either export; it is never stored. Losing it means losing access to the backup. Browser IndexedDB remains unencrypted.</p><label className="backup-passphrase">Backup passphrase (at least 12 characters)<input autoComplete="new-password" type="password" value={backupPassphrase} onChange={e=>setBackupPassphrase(e.target.value)} placeholder="Enter a strong unique passphrase" /></label><div className="actions"><button className="secondary" disabled={backupPassphrase.length<12||busy} onClick={()=>void backup()}><Download size={16}/> Export encrypted backup</button><label className="buttonlike">Restore encrypted or legacy backup<input hidden type="file" disabled={busy} accept=".json,application/json" onChange={e=>{void restore(e.target.files?.[0]);e.currentTarget.value='';}}/></label><button className="secondary" disabled={busy} onClick={()=>void enablePersistentStorage()}>Request persistent storage</button></div><p className="muted">Restore is merge-only: existing records are never silently replaced. Legacy plaintext backup files are accepted only after explicit warning. Browser storage persistence: {persistenceStatus}. Active exams are excluded from backup; complete the exam first.</p><BackupSafetyGuide hasActiveExam={!!session}/></section>
       </div>}
       {page==='exam'&&!session&&viewResult&&<div className="stack">
         <button className="subtle back" onClick={()=>setViewResult(null)}><ArrowLeft size={16}/> Back to exam setup</button>
         <section className="panel result"><CheckCircle2 size={38}/><p className="eyebrow">EXAM COMPLETE</p><h2>{pct(viewResult.correctCount,viewResult.total)}% accuracy</h2><p>{viewResult.correctCount} of {viewResult.total} questions correct · {viewResult.certification} · {viewResult.bankTitle}</p><p className="muted">Practice accuracy is not equivalent to an official certification scaled score.</p></section>
+        {resultBreakdown&&<section className="panel" aria-label="Detailed examination result">
+          <h3>Answer breakdown</h3>
+          <div className="insight-stats">
+            <span>Correct: <strong>{resultBreakdown.correct}</strong></span>
+            <span>Incorrect: <strong>{resultBreakdown.incorrect}</strong></span>
+            <span>Unanswered: <strong>{resultBreakdown.unanswered}</strong></span>
+          </div>
+          {resultBreakdown.correct!==viewResult.correctCount&&<p className="muted" role="status">
+            Stored historical score differs from the answer snapshot recalculation. Original record was not changed.
+          </p>}
+          <h4>By domain</h4>
+          {resultBreakdown.domains.length===0?<p className="muted">No domain snapshots available.</p>:
+            <div className="insight-list">{resultBreakdown.domains.map(item=>
+              <div key={item.domain} className="insight-line">
+                <strong>{item.domain}</strong>
+                <span>{item.correct}/{item.total} correct · {item.incorrect} incorrect · {item.unanswered} unanswered</span>
+              </div>)}</div>}
+          <h4>Suggested revision priorities</h4>
+          {resultBreakdown.reviewAreas.length?<ul className="insight-suggestions">
+            {resultBreakdown.reviewAreas.map(item=><li key={item.domain}>
+              Review the explanations for {item.domain}:
+              {' '}{item.incorrect} incorrect and {item.unanswered} unanswered out of {item.total} questions.
+            </li>)}
+          </ul>:<p className="muted">No incorrect or unanswered question snapshots to prioritise.</p>}
+          <p className="muted">These are practice statistics, not an official scaled certification score.</p>
+        </section>}
         <section className="panel"><h3>Answer review</h3><div className="reviewlist">{viewResult.questionSnapshots.map((q,i)=><div key={q.id} className="review"><div className="sectionhead"><strong>{i+1}. {q.question}</strong><span className={'pill '+(isCorrect(q,viewResult.answers[q.id]??[])?'ok':'incorrect')}>{isCorrect(q,viewResult.answers[q.id]??[])?'Correct':'Incorrect'}</span></div>{q.options.map(o=><div className={'reviewoption '+(q.correct_answers.includes(o.id)?'correctoption':'')} key={o.id}><strong>{o.id}.</strong> {o.text}{q.correct_answers.includes(o.id)?' ✓':''}{(viewResult.answers[q.id]??[]).includes(o.id)?' · Your answer':''}</div>)}<p className="muted">{q.explanation}</p></div>)}</div></section>
       </div>}
       {page==='exam'&&!session&&!viewResult&&examAccess==='idle'&&<div className="stack"><section className="panel">
@@ -462,8 +564,57 @@ export default function App() {
       {page==='analytics'&&<div className="stack">
         <section className="stats"><div className="stat"><span>Completed exams</span><strong>{attempts.length}</strong></div><div className="stat"><span>Questions answered</span><strong>{totalAttempted}</strong></div><div className="stat"><span>Total correct</span><strong>{totalCorrect}</strong></div><div className="stat"><span>Overall accuracy</span><strong>{pct(totalCorrect,totalAttempted)}%</strong></div></section>
         <section className="panel"><h3>Domain performance</h3>{domainStats.length===0?<p className="empty">Take an exam to view your performance by domain.</p>:<div className="domains">{domainStats.map(d=><div key={d.name} className="domainrow"><div className="sectionhead"><strong>{d.name}</strong><span>{d.correct}/{d.total} · {pct(d.correct,d.total)}%</span></div><div className="meter"><progress aria-label={d.name+' accuracy'} value={d.correct} max={d.total}/></div></div>)}</div>}</section>
-        <section className="panel"><h3>Exam history</h3>{attempts.length===0?<p className="empty">No completed attempts yet.</p>:<div className="records">{attempts.map(a=><button className="record" key={a.id} onClick={()=>{setViewResult(a);setPage('exam');}}><div><strong>{a.certification} — {a.bankTitle}</strong><small>{formatDate(a.completedAt)} · {a.total} questions</small></div><strong>{pct(a.correctCount,a.total)}%</strong></button>)}</div>}</section>
-        <section className="panel"><h3>Backup and recovery</h3><p className="muted">Export exam history and banks encrypted with a strong passphrase using AES-256-GCM.</p><label className="backup-passphrase">Backup passphrase<input autoComplete="new-password" type="password" value={backupPassphrase} onChange={e=>setBackupPassphrase(e.target.value)} placeholder="At least 12 characters" /></label><button className="secondary" disabled={backupPassphrase.length<12||busy} onClick={()=>void backup()}><Download size={16}/> Export encrypted backup</button></section>
+        <section className="panel" aria-label="Weak-domain identification">
+          <h3>Priority review domains</h3>
+          {weakDomainPriorities.length===0?
+            <p className="muted">Not enough practice data yet. At least five question observations per domain are required before highlighting weak areas.</p>:
+            <div className="insight-list">{weakDomainPriorities.map(row=>
+              <div key={row.name} className="insight-line"><strong>{row.name}</strong>
+                <span>{row.correct}/{row.total} correct · {pct(row.correct,row.total)}% practice accuracy</span>
+              </div>)}</div>}
+          <p className="muted">Repeated practice questions count as separate observations. Use these priorities for revision, not as a prediction of certification exam readiness.</p>
+        </section>
+        <section className="panel">
+          <h3>Exam history</h3>
+          {attempts.length===0?<p className="empty">No completed attempts yet.</p>:<>
+            <div className="filtergrid" aria-label="Examination history filters">
+              <label>Certification
+                <select aria-label="Filter history by certification"
+                  value={historyCertFilter} onChange={e=>setHistoryCertFilter(e.target.value)}>
+                  <option value="ALL">All certifications</option>
+                  {historyCertifications.map(value=><option key={value} value={value}>{value}</option>)}
+                </select>
+              </label>
+              <label>Practice score
+                <select aria-label="Filter history by score"
+                  value={historyScoreFilter} onChange={e=>setHistoryScoreFilter(e.target.value as ScoreBand)}>
+                  <option value="all">All scores</option>
+                  <option value="below60">Below 60%</option>
+                  <option value="between60and79">60–79%</option>
+                  <option value="atleast80">80% or above</option>
+                </select>
+              </label>
+              <label>From date (UTC)
+                <input aria-label="History from date UTC" type="date"
+                  value={historyDateFrom} onChange={e=>setHistoryDateFrom(e.target.value)}/>
+              </label>
+              <label>To date (UTC)
+                <input aria-label="History to date UTC" type="date"
+                  value={historyDateTo} onChange={e=>setHistoryDateTo(e.target.value)}/>
+              </label>
+            </div>
+            <p className="muted">{filteredHistory.length} of {attempts.length} completed attempts shown.</p>
+            {filteredHistory.length===0?<p className="empty" role="status">
+              No examinations match these filters. Broaden the date range or score band.
+            </p>:<div className="records">{filteredHistory.map(a=>
+              <button className="record" key={a.id} onClick={()=>{setViewResult(a);setPage('exam');}}>
+                <div><strong>{a.certification} — {a.bankTitle}</strong>
+                  <small>{formatDate(a.completedAt)} · {a.total} questions</small>
+                </div><strong>{pct(a.correctCount,a.total)}%</strong>
+              </button>)}</div>}
+          </>}
+        </section>
+        <section className="panel"><h3>Backup and recovery</h3><p className="muted">Export exam history and banks encrypted with a strong passphrase using AES-256-GCM.</p><label className="backup-passphrase">Backup passphrase<input autoComplete="new-password" type="password" value={backupPassphrase} onChange={e=>setBackupPassphrase(e.target.value)} placeholder="At least 12 characters" /></label><button className="secondary" disabled={backupPassphrase.length<12||busy} onClick={()=>void backup()}><Download size={16}/> Export encrypted backup</button><BackupSafetyGuide hasActiveExam={!!session}/></section>
       </div>}
       <footer>ExamPrep Engine v0.3.0 · Your data stays in this browser · Not affiliated with certification providers</footer>
     </main>

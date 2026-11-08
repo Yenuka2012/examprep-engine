@@ -42,3 +42,23 @@
   padding:9px 12px;border-radius:9px;max-width:100%}
 @media(max-width:600px){.navigator-filter{align-items:stretch;flex-direction:column}
 .navigator-filter select{width:100%}}
+
+/* v0.3.2-B/C: accessible, read-only search/analytics and backup guidance. */
+.filtergrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:12px;
+  margin:17px 0}
+.filtergrid label{display:grid;gap:7px;color:#becbe5;font-size:13px}
+.filtergrid input,.filtergrid select{background:#222d44;border:1px solid #3e4b65;
+  color:#fff;padding:10px 12px;border-radius:9px;width:100%;min-width:0}
+.insight-stats{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0 24px}
+.insight-stats span{background:#1d2e46;border:1px solid #3b4d70;padding:12px;
+  border-radius:9px}
+.insight-list{display:grid;gap:9px;margin:12px 0}
+.insight-line{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;
+  border:1px solid #33435e;background:#1b2940;border-radius:9px;padding:12px}
+.insight-line span{color:#b5c1d7;font-size:13px}
+.insight-suggestions{color:#b5c1d7;line-height:1.65;padding-left:24px}
+.backup-safety-guide{border:1px solid #405071;border-radius:9px;padding:14px;
+  margin-top:18px;background:#19263d}
+.backup-safety-guide summary{cursor:pointer;color:#cbd6ff;font-weight:600}
+.backup-safety-guide ol{padding-left:22px;color:#b5c1d7;font-size:13px;line-height:1.7}
+@media(max-width:600px){.insight-line{flex-direction:column}}
