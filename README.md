@@ -2,7 +2,7 @@
 
 A free, browser-based, local-first exam preparation application for multiple certifications.
 
-## Available capabilities (v0.3.1 release; owner physical-device acceptance pending)
+## Available capabilities (v0.3.2 release candidate; owner physical-device acceptance pending)
 - JSON question-bank import with strict schema validation (single- and multiple-choice)
 - Timed examinations, question navigation, flags, scoring and answer review
 - Persistent local question banks, history, unfinished exams, certification profiles and versioned syllabus catalogs using IndexedDB (Dexie schema v3)
@@ -12,6 +12,12 @@ A free, browser-based, local-first exam preparation application for multiple cer
 - Scoped offline-capable PWA (after first online load)
 - CI typechecking, unit/security tests, reproducible npm ci, dependency audit, Chromium/WebKit Playwright, CodeQL, SBOM and asset hashes
 - GitHub Pages deployment requires passing verify, browser and CodeQL gates on the same workflow run
+
+## v0.3.2 planned release: minimal-impact examination UX and learning insights
+
+Candidate includes the nine owner-approved enhancements (original #1–7, #10, #12): cancelable pre-submission counts; question navigator filters; five-minute/one-minute timer notices; bank search by title, certification, provider when catalog metadata matches, and domain; completed-attempt history filters; sample-size-aware weak-domain indicators; read-only backup/recovery guidance; editable exam presets; and immutable-snapshot-based result breakdowns. Changes are confined to React UI, derived read-only metrics, and a read-only catalog lookup. No new packages, Dexie schema changes, autosave or Web Lock changes, backup format changes, or experimental vault activation.
+
+**Review status:** Release candidate only; not merged or deployed. Production remains v0.3.1 until protected release approval and the actual `main` deployment job succeeds. See [v0.3.2 release checklist](docs/releases/V0.3.2-RELEASE-READINESS.md), [acceptance details](docs/features/V0.3.2-MINIMAL-IMPACT-ACCEPTANCE.md) and [tracking issue #113](https://github.com/Yenuka2012/examprep-engine/issues/113). This candidate does not authorize migration or deletion of owner data.
 
 ## v0.3.1 non-destructive security foundations release
 The isolated S1–S5 vault cryptography, authenticated transfer, synthetic migration journal and fail-closed readiness source are included for automated testing only. The **production application entry and UI are unchanged**; the synthetic vault harness is not served on GitHub Pages. The active examprep-v1 database is still plaintext at rest and is neither migrated nor deleted. See [release decision](docs/releases/V0.3.1-SECURITY-FOUNDATIONS-RELEASE.md). The encrypted vault is NOT activated and issue #100 remains a blocker for real cutover.
