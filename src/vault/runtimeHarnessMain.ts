@@ -86,6 +86,25 @@ export const m28={
     });
     return (await ctx.runtime.listBanks()).length;
   },
+  async concurrentBankImport(){
+    const ctx=checked(),bank=syntheticLegacyFixture().banks[0];
+    const second=new EncryptedExamRuntime(binding!);
+    const completed=await Promise.allSettled([
+      ctx.runtime.addBank(bank),second.addBank(bank)
+    ]);
+    return {
+      successes:completed.filter(result=>result.status==='fulfilled').length,
+      rejected:completed.filter(result=>result.status==='rejected').length,
+      banks:(await ctx.runtime.listBanks()).length
+    };
+  },
+  async injectUnknownActiveSlot(){
+    const ctx=checked();
+    await ctx.owner.save('active-session',{
+      synthetic:'unsupported-legacy-active-session'
+    });
+    return 'legacy-encrypted-record-present';
+  },
   async start(){
     const ctx=checked();
     return ctx.runtime.startExam(fixtureSession());
@@ -130,6 +149,20 @@ export const m28={
       recordId:ACTIVE_SLOT_ID,expectedNonce:active.nonce
     });
     return 'prepared-without-attempt';
+  },
+  async prepareCrashAfterAttemptWrite(){
+    const ctx=checked(),active=await ctx.runtime.resumeExam();
+    if(!active)throw new Error('Cannot prepare missing test exam');
+    const attempt=verifiedAttempt(active.session),attemptRecordId=crypto.randomUUID();
+    await ctx.owner.save('active-session',{
+      format:'examprep-encrypted-active-slot-v1',phase:'preparing',
+      session:active.session,attempt,attemptRecordId
+    },{recordId:ACTIVE_SLOT_ID,expectedNonce:active.nonce});
+    await ctx.owner.save('attempt',{
+      format:'examprep-encrypted-exam-record-v1',
+      logicalId:attempt.id,value:attempt
+    },{recordId:attemptRecordId});
+    return 'prepared-and-attempt-written-not-sealed';
   },
   async corruptedLegacyDecoy(){
     const ctx=checked();
