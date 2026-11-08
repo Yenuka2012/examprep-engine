@@ -28,6 +28,29 @@
 - Spaced repetition (FSRS or equivalent) with inspectable scheduling inputs.
 - Study planner and daily goals, exportable history.
 
+## Approved release v0.3.2 — Minimal-impact examination UX and learning insights (planned)
+
+**Decision confirmed 8 November 2026:** include recommendations **1–7, 10 and 12** (nine enhancements). Canonical scope and acceptance: [#113](https://github.com/Yenuka2012/examprep-engine/issues/113). This is a plan, not approval to implement or deploy.
+
+**v0.3.2-A — Exam interaction (original features 1, 2, 3, 10)**
+- Pre-submission summary of answered, unanswered and flagged questions before explicit confirmation.
+- Navigator filters for all, answered, unanswered and flagged items, without changing saved answers.
+- Non-blocking, accessible 5-minute/1-minute examination timer alerts, without changing expiry/submission logic.
+- Optional quick exam presets (question count/duration) using existing validated configuration.
+
+**v0.3.2-B — Discovery and learning insights (original features 4, 5, 6, 12)**
+- Client-side question-bank search/filter by certification/provider, title and domain.
+- Historical attempt filters by certification, score and completion date.
+- Weak-domain identification from existing completed-attempt data, with sample sizes and insufficient-data handling.
+- Improved results breakdown: correct, incorrect, unanswered, domain insights and targeted revision suggestions, without changing scoring.
+
+**v0.3.2-C — Recovery safety guidance (original feature 7)**
+- Read-only backup/recovery checklist clarifying that unfinished exams are excluded from encrypted logical-v2 exports. Do not invoke backup/restore automatically.
+
+**Architectural guardrails:** React UI and derived-data logic only where feasible; no production IndexedDB schema, exam autosave/locking, grading, encrypted backup format, PWA/service-worker or vault-cryptography changes; no paid components. Retain both Pages and private Ubuntu VM hosting, single owner and responsive iPhone/iPad design. Full strict TS, Vitest, all Playwright/security suites, CodeQL and Pages isolation checks before any eventual deployment. Issues #78/#83 and #100 remain independent security/recovery blockers.
+
+**Out of scope for this release:** features 8, 9, 11 and 13–16. Keep them deferred and do not merge the M2 experimental vault drafts into this UX release.
+
 ## Release v0.4 — reliability and content quality
 - Optional IndexedDB encrypted-at-rest vault with reviewed key lifecycle.
 - Resilient long-lived backups/version migrations and recovery from browser storage eviction.
