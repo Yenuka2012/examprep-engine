@@ -124,10 +124,14 @@ export const m28={
        !('phase' in slot.value)||slot.value.phase!=='preparing'){
       throw new Error('Synthetic preparing intent required');
     }
-    const value=slot.value as {attempt:Attempt};
+    if(!('attempt' in slot.value)||!slot.value.attempt||
+       typeof slot.value.attempt!=='object'){
+      throw new Error('Malformed synthetic preparing attempt');
+    }
+    const attempt=slot.value.attempt as Attempt;
     await ctx.owner.save('attempt',{
       format:'examprep-encrypted-exam-record-v1',
-      logicalId:value.attempt.id,value:value.attempt
+      logicalId:attempt.id,value:attempt
     });
     return 'conflicting-attempt-id-in-different-ciphertext-record';
   },
