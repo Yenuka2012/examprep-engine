@@ -34,3 +34,11 @@
   .nav{min-width:0;max-width:100%;flex:1 1 auto;overflow-x:auto;overflow-y:hidden;justify-content:flex-start;scrollbar-width:thin;-webkit-overflow-scrolling:touch}
   .navbtn{flex:0 0 auto}
 }
+
+/* v0.3.2-A: client-only filtered navigator, responsive and keyboard accessible. */
+.navigator-filter{display:flex;align-items:center;flex-wrap:wrap;gap:10px;color:#bdc8dd;
+  font-size:13px;margin-top:18px}
+.navigator-filter select{background:#222d44;border:1px solid #3e4b65;color:#fff;
+  padding:9px 12px;border-radius:9px;max-width:100%}
+@media(max-width:600px){.navigator-filter{align-items:stretch;flex-direction:column}
+.navigator-filter select{width:100%}}
