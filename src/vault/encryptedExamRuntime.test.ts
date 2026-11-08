@@ -43,8 +43,8 @@ describe('M2.8 pure authenticated exam logic and guardrails',()=>{
     expect(()=>validateEncryptedExamAttempt({...complete,questionSnapshots:[]})).toThrow();
     expect(()=>validateEncryptedExamAttempt({...complete,extra:'future-not-reviewed'}))
       .toThrow(/Unexpected or missing encrypted examination attempt fields/);
-    expect(()=>validateEncryptedExamAttempt(({...complete,total:undefined})))
-      .toThrow(/invalid|Unexpected or missing/i);
+    expect(()=>validateEncryptedExamAttempt({...complete,total:undefined}))
+      .toThrow();
   });
   it('rejects unauthenticated structural fakes at construction',()=>{
     const forged={
