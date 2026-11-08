@@ -53,6 +53,7 @@ test('real AES-GCM vault encrypts bank, CAS autosaves, resumes and submits exact
 test('interruption after encrypted intent recovers exactly one verified attempt after reload',async({page})=>{
   await page.goto(pageUrl);
   await page.evaluate(async ([m,r])=>window.m28.enroll(m,r),[MASTER,RECOVERY]);
+  await page.evaluate(()=>window.m28.importBank());
   await page.evaluate(()=>window.m28.start());
   await page.evaluate(()=>window.m28.answer());
   await expect(page.evaluate(()=>window.m28.prepareCrash())).resolves.toBe('prepared-without-attempt');
@@ -93,6 +94,7 @@ test('two runtime instances sharing one owner session cannot create duplicate lo
 test('crash after durable attempt write but before slot seal recovers without duplication',async({page})=>{
   await page.goto(pageUrl);
   await page.evaluate(async ([m,r])=>window.m28.enroll(m,r),[MASTER,RECOVERY]);
+  await page.evaluate(()=>window.m28.importBank());
   await page.evaluate(()=>window.m28.start());
   await page.evaluate(()=>window.m28.answer());
   await expect(page.evaluate(()=>window.m28.prepareCrashAfterAttemptWrite()))
@@ -113,4 +115,36 @@ test('unknown encrypted active-session record is never silently ignored or auto-
     .rejects.toThrow(/Unexpected encrypted active-session records/);
   await expect(page.evaluate(()=>window.m28.start()))
     .rejects.toThrow(/Unexpected encrypted active-session records/);
+});
+
+
+test('synthetic exam cannot start without an authenticated matching encrypted bank',async({page})=>{
+  await page.goto(pageUrl);
+  await page.evaluate(async ([m,r])=>window.m28.enroll(m,r),[MASTER,RECOVERY]);
+  await expect(page.evaluate(()=>window.m28.start()))
+    .rejects.toThrow(/Examination bank missing or differs from encrypted vault/);
+  expect(await page.evaluate(()=>window.m28.importBank())).toBe(1);
+  await expect(page.evaluate(()=>window.m28.startWithModifiedBank()))
+    .rejects.toThrow(/Examination bank missing or differs from encrypted vault/);
+  const current=await page.evaluate(()=>window.m28.resume());
+  expect(current).toBeNull();
+  const valid=await page.evaluate(()=>window.m28.start());
+  expect(valid.session.bank.bank_id).toBe('SYNTH-BANK-001');
+});
+
+test('synthetic corrupted preparing intent cannot add second attempt with same logical ID',async({page})=>{
+  await page.goto(pageUrl);
+  await page.evaluate(async ([m,r])=>window.m28.enroll(m,r),[MASTER,RECOVERY]);
+  await page.evaluate(()=>window.m28.importBank());
+  await page.evaluate(()=>window.m28.start());
+  await page.evaluate(()=>window.m28.answer());
+  await page.evaluate(()=>window.m28.prepareCrash());
+  await expect(page.evaluate(()=>window.m28.injectDuplicateAttemptForPreparedIntent()))
+    .resolves.toBe('conflicting-attempt-id-in-different-ciphertext-record');
+  await expect(page.evaluate(()=>window.m28.resume()))
+    .rejects.toThrow(/Duplicate encrypted attempt identity; recovery review required/);
+  expect(await page.evaluate(()=>window.m28.attemptCount())).toBe(1);
+  await expect(page.evaluate(()=>window.m28.resume()))
+    .rejects.toThrow(/Duplicate encrypted attempt identity; recovery review required/);
+  expect(await page.evaluate(()=>window.m28.attemptCount())).toBe(1);
 });
