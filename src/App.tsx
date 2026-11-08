@@ -16,6 +16,7 @@ import { isCorrect, shuffle, validateBank } from './logic';
 import { encryptBackup, type EncryptedBackup } from './crypto';
 import { decodeBackup, restoreBackup, requestPersistentStorage } from './recovery';
 import type { Attempt, ExamSession, QuestionBank } from './types';
+import {EXAM_PRESETS,examOverview,navigatorItems,examTimeNotice,submissionReview,type NavigatorFilter} from './examUx';
 
 type Page = 'dashboard' | 'banks' | 'catalog' | 'exam' | 'analytics';
 const SESSION_KEY = 'examprep-active-session-v1';
@@ -49,6 +50,7 @@ export default function App() {
   const [selectedBank,setSelectedBank]=useState('');
   const [examSize,setExamSize]=useState(20);
   const [examMinutes,setExamMinutes]=useState(30);
+  const [navigatorFilter,setNavigatorFilter]=useState<NavigatorFilter>('all');
   const [domain,setDomain]=useState('ALL');
   const [error,setError]=useState('');
   const [notice,setNotice]=useState('');
@@ -246,6 +248,7 @@ export default function App() {
         durationSeconds:examMinutes*60,endsAt:Date.now()+examMinutes*60000
       };
       const actual=await createActiveExam(proposed);
+      setNavigatorFilter('all');
       setViewResult(null);setSession(actual);setNow(Date.now());setExamAccess('owner');setPage('exam');
     }catch{
       await lock.release();
@@ -389,6 +392,17 @@ export default function App() {
           <label>Domain<select value={domain} onChange={e=>setDomain(e.target.value)}><option value="ALL">All domains</option>{domains.map(d=><option key={d} value={d}>{d}</option>)}</select></label>
           <label>Number of questions<input type="number" min="1" max={Math.max(1,eligible.length)} value={examSize} onChange={e=>setExamSize(Math.max(1,Math.min(10000,Number(e.target.value)||1)))}/></label>
           <label>Duration (minutes)<input type="number" min="1" max="300" value={examMinutes} onChange={e=>setExamMinutes(Math.max(1,Math.min(300,Number(e.target.value)||1)))}/></label>
+          <div className="full">
+            <span className="muted">Quick presets (editable):</span>
+            <div className="actions" aria-label="Examination presets">
+              {EXAM_PRESETS.map(preset=><button key={preset.label} type="button"
+                className="secondary small" disabled={!eligible.length}
+                onClick={()=>{
+                  setExamSize(Math.min(preset.questions,eligible.length));
+                  setExamMinutes(preset.minutes);
+                }}>{preset.label}</button>)}
+            </div>
+          </div>
           <div className="full muted">{eligible.length} questions available in selected domain. An exam samples without replacement.</div>
           <button className="primary full" disabled={!eligible.length||!sessionLoaded||examAccess!=='idle'} onClick={()=>void startExam()}><Play size={18}/> Start examination</button>
         </div>}
@@ -402,15 +416,48 @@ export default function App() {
           <p className="muted">This tab detected an incompatible database version. Editing and submission are disabled to prevent unsafe writes. The in-memory exam state has not been cleared, but recent changes may not be durably saved. Do not reload, close or clear storage until recovery is verified.</p>
           <p className="muted">Complete recovery or update using a compatible application. An encrypted logical-v2 backup does not contain unfinished exam sessions.</p>
         </section>}
-      {page==='exam'&&session&&examAccess==='owner'&&!storageUpdateMessage&&(()=>{const q=session.questions[session.index];const picked=session.answers[q.id]??[];return <div className="stack">
+      {page==='exam'&&session&&examAccess==='owner'&&!storageUpdateMessage&&(()=>{const q=session.questions[session.index];const picked=session.answers[q.id]??[];
+        const overview=examOverview(session);
+        const navigator=navigatorItems(session,navigatorFilter);
+        const timeNotice=examTimeNotice(timeLeft);
+        return <div className="stack">
         <section role="status" aria-live="polite" className={'alert '+(saveStatus==='failed'?'warn':'')}>
           {saveStatus==='saved'?'Exam progress saved locally.':saveStatus==='saving'?'Saving exam progress…':'Autosave failed. Latest changes may be unsaved.'}
           {saveStatus==='failed'&&<button onClick={retrySave}>Retry save</button>}
         </section>
         <section className="examtoolbar"><div><span className="eyebrow">{session.bank.certification} · {q.domain}</span><strong>Question {session.index+1} of {session.questions.length}</strong></div><div className={'timer '+(timeLeft<60?'urgent':'')}><Clock3 size={18}/> {fmtTime(timeLeft)}</div></section>
+        {timeNotice&&<div className="alert warn" role="status" aria-live="polite">{timeNotice}</div>}
         <div className="progress"><progress aria-label="Exam progress" value={session.index+1} max={session.questions.length}/></div>
         <section className="panel questionpanel"><div className="sectionhead"><span className="pill">{q.type==='multiple_choice'?'Select all that apply':'Select one answer'}</span><button className="subtle" onClick={flag}><Flag size={16}/> {session.marked.includes(q.id)?'Unflag':'Flag'}</button></div><h2>{q.question}</h2><div className="choices">{q.options.map(o=><label className={'choice '+(picked.includes(o.id)?'selected':'')} key={o.id}><input type={q.type==='multiple_choice'?'checkbox':'radio'} name={'choice-'+q.id} checked={picked.includes(o.id)} onChange={()=>answer(q.id,o.id,q.type==='multiple_choice')}/><span className="letter">{o.id}</span><span>{o.text}</span></label>)}</div></section>
-        <section className="panel"><div className="sectionhead"><h3>Question navigator</h3><span className="muted">{Object.keys(session.answers).filter(k=>(session.answers[k]??[]).length).length} answered</span></div><div className="numbergrid">{session.questions.map((item,i)=><button key={item.id} title={'Question '+(i+1)} className={'num '+(i===session.index?'current ':'')+((session.answers[item.id]??[]).length?'answered ':'')+(session.marked.includes(item.id)?'flagged':'')} onClick={()=>move(i)}>{i+1}</button>)}</div><div className="actions spread"><button className="secondary" disabled={session.index===0} onClick={()=>move(session.index-1)}>← Previous</button><button className="secondary" disabled={session.index===session.questions.length-1} onClick={()=>move(session.index+1)}>Next →</button></div><div className="examend"><button className="danger" onClick={()=>{if(window.confirm('Submit exam now? Unanswered questions will be marked incorrect.'))completeExam(session);}}>Submit exam</button></div></section>
+        <section className="panel">
+          <div className="sectionhead"><h3>Question navigator</h3>
+            <span className="muted">{overview.answered} answered · {overview.unanswered} unanswered · {overview.flagged} flagged</span>
+          </div>
+          <label className="navigator-filter">Show questions
+            <select aria-label="Question navigator filter" value={navigatorFilter}
+              onChange={e=>setNavigatorFilter(e.target.value as NavigatorFilter)}>
+              <option value="all">All ({overview.total})</option>
+              <option value="answered">Answered ({overview.answered})</option>
+              <option value="unanswered">Unanswered ({overview.unanswered})</option>
+              <option value="flagged">Flagged ({overview.flagged})</option>
+            </select>
+          </label>
+          {navigator.length?<div className="numbergrid">{navigator.map(({id,index})=>
+            <button key={id} title={'Question '+(index+1)}
+              aria-label={'Go to question '+(index+1)}
+              className={'num '+(index===session.index?'current ':'')+
+                ((session.answers[id]??[]).length?'answered ':'')+
+                (session.marked.includes(id)?'flagged':'')}
+              onClick={()=>move(index)}>{index+1}</button>)}</div>:
+            <p className="muted" role="status">No questions match this filter. Choose All to see the full paper.</p>}
+          <div className="actions spread"><button className="secondary"
+            disabled={session.index===0} onClick={()=>move(session.index-1)}>← Previous</button>
+            <button className="secondary" disabled={session.index===session.questions.length-1}
+              onClick={()=>move(session.index+1)}>Next →</button></div>
+          <div className="examend"><button className="danger"
+            onClick={()=>{if(window.confirm(submissionReview(session)))completeExam(session);}}>
+            Submit exam</button></div>
+        </section>
       </div>;})()}
       {page==='analytics'&&<div className="stack">
         <section className="stats"><div className="stat"><span>Completed exams</span><strong>{attempts.length}</strong></div><div className="stat"><span>Questions answered</span><strong>{totalAttempted}</strong></div><div className="stat"><span>Total correct</span><strong>{totalCorrect}</strong></div><div className="stat"><span>Overall accuracy</span><strong>{pct(totalCorrect,totalAttempted)}%</strong></div></section>

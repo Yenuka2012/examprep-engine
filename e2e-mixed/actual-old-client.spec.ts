@@ -77,7 +77,7 @@ test('real pre-barrier v0.3.0 bundle bypasses an exclusive newer Web Lock',async
   const newer=await context.newPage();
   try{
     await newer.goto(NEW);
-    expect(await nativeVersion(page)).toBe(NATIVE_V3);
+    await expect.poll(()=>nativeVersion(page),{timeout:10000}).toBe(NATIVE_V3);
     await holdBarrier(newer);
     await oldImport(page,'LEGACY-WEBLOCK','Real obsolete bundle wrote through lock');
     expect(await rawRecordExists(page,'LEGACY-WEBLOCK')).toBe(true);
@@ -96,7 +96,9 @@ test('inert native upgrade alone is no storage ACL: versionless writer still wor
   const newer=await context.newPage();
   await newer.goto(NEW);
   await expect(newer.getByRole('heading',{name:'Overview'})).toBeVisible();
-  expect(await nativeVersion(newer)).toBe(NATIVE_V3);
+  // Safari may render Overview before the initial asynchronous Dexie open.
+  // Retain the exact v30 expectation and give the real open time to finish.
+  await expect.poll(()=>nativeVersion(newer),{timeout:10000}).toBe(NATIVE_V3);
   const nativeResult=await page.evaluate(async ({name,version})=>{
     return new Promise<'upgraded'|'blocked'|'failed'>(resolve=>{
       const request=indexedDB.open(name,version);

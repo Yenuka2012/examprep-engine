@@ -1,7 +1,7 @@
 /**
- * v0.3.1 fail-closed release assertion (requires only Node built-ins).
+ * v0.3.2-A fail-closed release assertion (requires only Node built-ins).
  * TypeScript 7 intentionally has no stable compiler API. Instead, pin EVERY
- * ordinary production source/build entry to the approved main baseline.
+ * ordinary production source/build entry to its reviewed v0.3.2-A candidate blob.
  * Only the separately built synthetic vault and cutover modules may differ.
  * Build output is independently scanned for the vault test database/fixtures.
  * This is a release-specific change freeze, not a general TS import parser.
@@ -15,7 +15,7 @@ const frozen={
   "index.html": "8c89659de53b7857228fecbd0c663a3fc870c696",
   "public/favicon.svg": "778ad69298b6b89045dc8b0a924f85c27bf1c48d",
   "scripts/generate-validator.mjs": "afac5049c68a8a28f07679bc1e9f1a4655da6633",
-  "src/App.tsx": "39c47a51f97bca0249508a8244cc1bfe46b83ee8",
+  "src/App.tsx": "d3fb5e67fbf3a796e438c25004fc9e0e8ce2148e",
   "src/CatalogPanel.tsx": "78a207001d19908c32df5aecb32400707cd190c3",
   "src/CutoverReadinessPanel.tsx": "78a4666a45371a0c5af5ff6ebc44909d1ad69c9b",
   "src/PwaStatus.tsx": "dcb531a4b3e2965b46a019628c4b187f7d92f5e0",
@@ -32,6 +32,8 @@ const frozen={
   "src/cutoverSafety.test.ts": "3bda350ed7f8d037cc0e84bda1a6b1bf07e3bf81",
   "src/cutoverSafety.ts": "3679b282697bc4e7bd9f575570c6ab05cdaae397",
   "src/db.ts": "621263167fe537b7024356f9fd067cffd3acdb52",
+  "src/examUx.test.ts": "f99c77e20c87eca6505ad071cb690b10b0a89b97",
+  "src/examUx.ts": "4e8671fab757572463b42469ce1a03cde2a4d260",
   "src/examLock.test.ts": "bd70d94df2cf9935d8ea59ecd8bbd3a144dd3320",
   "src/examLock.ts": "4f9f58626035abfb38890284c0ce68b6f7301e0a",
   "src/examPersistence.ts": "c91871229444a23f56218be8d0677955224745fa",
@@ -52,7 +54,7 @@ const frozen={
   "src/schema.json": "03a6c56173914e4ab4d8d8cd22dfee7d9a3f1848",
   "src/storageVersionGuard.test.ts": "b4e1ab48d99812504ee92ac91912d95f4335bd12",
   "src/storageVersionGuard.ts": "523a8f222fb2ec2429d65a3ffee6e6460bf2e215",
-  "src/styles.css": "bc8e11e3e9d132683f0a0d26064be3f424fe0463",
+  "src/styles.css": "c937a30f6a65ce3aaef1e190e733b353e5fb3f3d",
   "src/types.ts": "0795739bbac673100aaea97a98ad528623f77f79",
   "src/vite-env.d.ts": "64251fba07826fb9f05570afb6d4b7d2b0cea3a2",
   "vite.config.ts": "78a2af5c70ca0c799de690a7bdfef8d5593cce71"
