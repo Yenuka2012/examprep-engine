@@ -19,7 +19,8 @@ export type OriginBlocker =
   | 'SOURCE_HOST_UNSAFE'
   | 'DESTINATION_HOST_UNSAFE'
   | 'SAME_ORIGIN'
-  | 'SAME_HOST_DIFFERENT_PORT';
+  | 'SAME_HOST_DIFFERENT_PORT'
+  | 'TARGET_HOSTING_MODEL_UNSUPPORTED';
 
 export type OriginPreflight = {
   format: 'examprep-origin-preflight-v1';
@@ -27,7 +28,7 @@ export type OriginPreflight = {
   readOnly: true;
   sourceOrigin: string | null;
   destinationOrigin: string | null;
-  targetHostingModel: TargetHostingModel;
+  targetHostingModel: TargetHostingModel | 'unknown';
   blockers: OriginBlocker[];
   requiredOwnerEvidence: readonly string[];
 };
@@ -86,6 +87,10 @@ export function assessEncryptedDestinationOrigin(input: {
   targetHostingModel: TargetHostingModel;
 }): OriginPreflight {
   const blockers: OriginBlocker[] = [];
+  // TypeScript alone does not enforce input types at JavaScript runtime.
+  const mode = input.targetHostingModel;
+  const modeSupported = mode === 'github-pages' || mode === 'private-ubuntu';
+  if (!modeSupported) blockers.push('TARGET_HOSTING_MODEL_UNSUPPORTED');
   const source = parseCandidate(input.legacySourceUrl, 'SOURCE', blockers);
   const dest = parseCandidate(input.encryptedDestinationUrl, 'DESTINATION', blockers);
 
@@ -101,9 +106,11 @@ export function assessEncryptedDestinationOrigin(input: {
 
   const requiredOwnerEvidence = [
     ...SHARED_EVIDENCE,
-    input.targetHostingModel === 'private-ubuntu'
-      ? 'Verify dedicated Ubuntu VM HTTPS, network isolation, VPN and offline recovery'
-      : 'Acknowledge public static Pages hosting and separately verify destination-host controls'
+    !modeSupported
+      ? 'Select a supported destination hosting model before any topology review'
+      : mode === 'private-ubuntu'
+        ? 'Verify dedicated Ubuntu VM HTTPS, network isolation, VPN and offline recovery'
+        : 'Acknowledge public static Pages hosting and separately verify destination-host controls'
   ];
 
   return {
@@ -112,7 +119,7 @@ export function assessEncryptedDestinationOrigin(input: {
     readOnly: true,
     sourceOrigin: source?.protocol === 'https:' ? source.origin : null,
     destinationOrigin: dest?.protocol === 'https:' ? dest.origin : null,
-    targetHostingModel: input.targetHostingModel,
+    targetHostingModel: modeSupported ? mode : 'unknown',
     blockers,
     requiredOwnerEvidence
   };

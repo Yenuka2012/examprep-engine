@@ -75,6 +75,19 @@ describe('M2.6 production origin preflight (pure, no storage/network)',()=>{
     expect(r.requiredOwnerEvidence.join(' ')).toContain('TLS certificate');
     expect(r.requiredOwnerEvidence.join(' ')).toContain('independently restored');
   });
+  it('fails closed for unsupported hosting modes even when two HTTPS origins differ',()=>{
+    // Untrusted runtime JavaScript can bypass TypeScript's compile-time union.
+    const invalid = assessEncryptedDestinationOrigin({
+      legacySourceUrl:source,
+      encryptedDestinationUrl:target,
+      targetHostingModel:'not-a-host' as unknown as 'github-pages'
+    });
+    expect(invalid).toMatchObject({
+      verdict:'BLOCKED',readOnly:true,targetHostingModel:'unknown'
+    });
+    expect(invalid.blockers).toContain('TARGET_HOSTING_MODEL_UNSUPPORTED');
+    expect(invalid.requiredOwnerEvidence.join(' ')).toContain('Select a supported');
+  });
   it('normalizes IDNA hostname and default HTTPS port consistently',()=>{
     const r=assess('https://vault.exam.example:443/new');
     expect(r.destinationOrigin).toBe('https://vault.exam.example');
