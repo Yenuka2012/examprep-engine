@@ -23,7 +23,9 @@
     "test:e2e:mixed": "playwright test --config playwright.mixed.config.ts",
     "build:vault-test": "vite build --config vite.vault.config.ts",
     "preview:vault-test": "vite preview --config vite.vault.config.ts",
-    "test:e2e:vault": "playwright test --config playwright.vault.config.ts"
+    "test:e2e:vault": "playwright test --config playwright.vault.config.ts",
+    "build:encrypted-test": "vite build --config vite.encrypted.config.ts --mode encrypted-test",
+    "preview:encrypted-test": "vite preview --config vite.encrypted.config.ts"
   },
   "dependencies": {
     "ajv": "8.20.0",

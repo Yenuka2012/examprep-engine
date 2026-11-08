@@ -17,10 +17,16 @@ export default defineConfig({
     {name:'iphone-webkit',use:{...devices['iPhone 13']}},
     {name:'ipad-webkit',use:{...devices['iPad Pro 11']}}
   ],
-  webServer:{
-    command:'npm run build:vault-test && npm run preview:vault-test',
-    url:'http://127.0.0.1:4174/vault-harness.html',
-    reuseExistingServer:!process.env.CI,
-    timeout:120_000
-  }
+  webServer:[
+    {
+      command:'npm run build:vault-test && npm run preview:vault-test',
+      url:'http://127.0.0.1:4174/vault-harness.html',
+      reuseExistingServer:!process.env.CI,timeout:120_000
+    },
+    {
+      command:'npm run build:encrypted-test && npm run preview:encrypted-test',
+      url:'http://127.0.0.1:4175/encrypted-owner.html',
+      reuseExistingServer:!process.env.CI,timeout:120_000
+    }
+  ]
 });
