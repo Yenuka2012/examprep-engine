@@ -56,12 +56,13 @@ test('filtered navigation and cancelable submission summary preserve active exam
 });
 
 test('5-minute and 1-minute warnings use the unchanged exam deadline',async({page})=>{
+  // Set the clock before the PWA installs the once-per-second tick.
+  await page.clock.install();
   await setup(page);
   await page.getByRole('button',{name:'Start examination'}).click();
   await expect(page.getByText(/Question 1 of/)).toBeVisible();
-  // Deadline is stored in IndexedDB. Shift Date.now with Playwright's clock
-  // rather than changing the stored duration or autosave logic.
-  await page.clock.install();
+  // Shift Date.now with Playwright's clock rather than changing persisted
+  // examination duration, autosave, or deadline computation.
   await page.clock.fastForward(25*60*1000);
   await expect(page.getByText('5 minutes or less remain in this examination.')).toBeVisible();
   await page.clock.fastForward(4*60*1000);
