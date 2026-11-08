@@ -19,7 +19,7 @@
 import {validateBank,isCorrect} from '../logic';
 import {validateExamSession} from '../examValidation';
 import {validateBackupData} from '../backup';
-import {validateCertification,validateSyllabus} from '../catalog';
+import {validateCertification,validateSyllabus} from '../catalogValidation';
 import type {
   Attempt,ExamSession,QuestionBank,CertificationProfile,SyllabusVersion
 } from '../types';
