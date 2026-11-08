@@ -81,3 +81,36 @@ test('recovery credential reopens AES-KW vault; imported record stays encrypted;
   await expect(page.evaluate(()=>window.m28.bankCount()))
     .rejects.toThrow(/Unrecognized encrypted content/);
 });
+
+
+test('two runtime instances sharing one owner session cannot create duplicate logical banks',async({page})=>{
+  await page.goto(pageUrl);
+  await page.evaluate(async ([m,r])=>window.m28.enroll(m,r),[MASTER,RECOVERY]);
+  const report=await page.evaluate(()=>window.m28.concurrentBankImport());
+  expect(report).toEqual({successes:1,rejected:1,banks:1});
+});
+
+test('crash after durable attempt write but before slot seal recovers without duplication',async({page})=>{
+  await page.goto(pageUrl);
+  await page.evaluate(async ([m,r])=>window.m28.enroll(m,r),[MASTER,RECOVERY]);
+  await page.evaluate(()=>window.m28.start());
+  await page.evaluate(()=>window.m28.answer());
+  await expect(page.evaluate(()=>window.m28.prepareCrashAfterAttemptWrite()))
+    .resolves.toBe('prepared-and-attempt-written-not-sealed');
+  await page.reload();
+  await page.evaluate(secret=>window.m28.unlock(secret),MASTER);
+  expect(await page.evaluate(()=>window.m28.resume())).toBeNull();
+  expect(await page.evaluate(()=>window.m28.attemptCount())).toBe(1);
+  expect(await page.evaluate(()=>window.m28.resume())).toBeNull();
+  expect(await page.evaluate(()=>window.m28.attemptCount())).toBe(1);
+});
+
+test('unknown encrypted active-session record is never silently ignored or auto-migrated',async({page})=>{
+  await page.goto(pageUrl);
+  await page.evaluate(async ([m,r])=>window.m28.enroll(m,r),[MASTER,RECOVERY]);
+  await page.evaluate(()=>window.m28.injectUnknownActiveSlot());
+  await expect(page.evaluate(()=>window.m28.resume()))
+    .rejects.toThrow(/Unexpected encrypted active-session records/);
+  await expect(page.evaluate(()=>window.m28.start()))
+    .rejects.toThrow(/Unexpected encrypted active-session records/);
+});
