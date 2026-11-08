@@ -1,5 +1,5 @@
 /**
- * v0.3.2-A fail-closed release assertion (requires only Node built-ins).
+ * v0.3.2-A/B/C fail-closed release assertion (requires only Node built-ins).
  * TypeScript 7 intentionally has no stable compiler API. Instead, pin EVERY
  * ordinary production source/build entry to its reviewed v0.3.2-A candidate blob.
  * Only the separately built synthetic vault and cutover modules may differ.
@@ -15,7 +15,7 @@ const frozen={
   "index.html": "8c89659de53b7857228fecbd0c663a3fc870c696",
   "public/favicon.svg": "778ad69298b6b89045dc8b0a924f85c27bf1c48d",
   "scripts/generate-validator.mjs": "afac5049c68a8a28f07679bc1e9f1a4655da6633",
-  "src/App.tsx": "d3fb5e67fbf3a796e438c25004fc9e0e8ce2148e",
+  "src/App.tsx": "b529ab65b2639b2ad5d8196b01b07a42120d0148",
   "src/CatalogPanel.tsx": "78a207001d19908c32df5aecb32400707cd190c3",
   "src/CutoverReadinessPanel.tsx": "78a4666a45371a0c5af5ff6ebc44909d1ad69c9b",
   "src/PwaStatus.tsx": "dcb531a4b3e2965b46a019628c4b187f7d92f5e0",
@@ -41,6 +41,9 @@ const frozen={
   "src/examValidation.ts": "67159d85832ef4b28c671317643e0608c928347b",
   "src/jsonEqual.test.ts": "5cfdb74aa0f54b2aac754b111bbcfd1dc824e561",
   "src/jsonEqual.ts": "584f14c4f97562e3215f7995ae198e38082060eb",
+  "src/learningInsights.test.ts": "57249bddc6b5e83c594c0ca3ac52d1f0c992a71f",
+  "src/learningInsights.ts": "1001d6ca4a9de1a71483b6a86ee43b990f554198",
+  "src/BackupSafetyGuide.tsx": "97364244dd07494cfc03c9ec80510d5e754b1982",
   "src/legacyWriteBarrier.test.ts": "223058f945cf362dddece58d2ad9165f843cbe8e",
   "src/legacyWriteBarrier.ts": "a7f90e455657204e97a2d234165be347e0cce622",
   "src/logic.test.ts": "efc7000fb0dfd2e5a2171e0837baa831facd8bce",
@@ -54,7 +57,7 @@ const frozen={
   "src/schema.json": "03a6c56173914e4ab4d8d8cd22dfee7d9a3f1848",
   "src/storageVersionGuard.test.ts": "b4e1ab48d99812504ee92ac91912d95f4335bd12",
   "src/storageVersionGuard.ts": "523a8f222fb2ec2429d65a3ffee6e6460bf2e215",
-  "src/styles.css": "c937a30f6a65ce3aaef1e190e733b353e5fb3f3d",
+  "src/styles.css": "f9329a2d1f9ce8f67ffb040bc1a6b0c68a0c080a",
   "src/types.ts": "0795739bbac673100aaea97a98ad528623f77f79",
   "src/vite-env.d.ts": "64251fba07826fb9f05570afb6d4b7d2b0cea3a2",
   "vite.config.ts": "78a2af5c70ca0c799de690a7bdfef8d5593cce71"
