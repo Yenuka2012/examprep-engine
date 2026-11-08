@@ -122,7 +122,7 @@ function validateProvenance(raw:unknown):Provenance{
       'banks','attempts','certifications','syllabi'
     ])&&Array.isArray(raw.entries));
   for(const value of Object.values(raw.counts)){
-    assert(Number.isSafeInteger(value)&&typeof value==='number'&&value>=0);
+    assert(typeof value==='number'&&Number.isSafeInteger(value)&&value>=0);
   }
   const seen=new Set<string>();
   for(const row of raw.entries){
