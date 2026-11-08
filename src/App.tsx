@@ -616,7 +616,7 @@ export default function App() {
         </section>
         <section className="panel"><h3>Backup and recovery</h3><p className="muted">Export exam history and banks encrypted with a strong passphrase using AES-256-GCM.</p><label className="backup-passphrase">Backup passphrase<input autoComplete="new-password" type="password" value={backupPassphrase} onChange={e=>setBackupPassphrase(e.target.value)} placeholder="At least 12 characters" /></label><button className="secondary" disabled={backupPassphrase.length<12||busy} onClick={()=>void backup()}><Download size={16}/> Export encrypted backup</button><BackupSafetyGuide hasActiveExam={!!session}/></section>
       </div>}
-      <footer>ExamPrep Engine v0.3.0 · Your data stays in this browser · Not affiliated with certification providers</footer>
+      <footer>ExamPrep Engine v0.3.2 · Your data stays in this browser · Not affiliated with certification providers</footer>
     </main>
   </div>;
 }
