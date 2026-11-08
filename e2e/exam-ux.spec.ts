@@ -68,3 +68,8 @@ test('5-minute and 1-minute warnings use the unchanged exam deadline',async({pag
   await page.clock.fastForward(4*60*1000);
   await expect(page.getByText('1 minute or less remains in this examination.')).toBeVisible();
 });
+
+test('release candidate identifies version 0.3.2 in the production footer',async({page})=>{
+  await page.goto('/examprep-engine/');
+  await expect(page.locator('footer')).toContainText('ExamPrep Engine v0.3.2');
+});

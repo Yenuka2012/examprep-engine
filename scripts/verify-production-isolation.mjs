@@ -1,7 +1,7 @@
 /**
- * v0.3.2-A/B/C fail-closed release assertion (requires only Node built-ins).
+ * v0.3.2 release fail-closed release assertion (requires only Node built-ins).
  * TypeScript 7 intentionally has no stable compiler API. Instead, pin EVERY
- * ordinary production source/build entry to its reviewed v0.3.2-A candidate blob.
+ * ordinary production source/build entry to its reviewed v0.3.2 release-candidate blob.
  * Only the separately built synthetic vault and cutover modules may differ.
  * Build output is independently scanned for the vault test database/fixtures.
  * This is a release-specific change freeze, not a general TS import parser.
@@ -15,7 +15,7 @@ const frozen={
   "index.html": "8c89659de53b7857228fecbd0c663a3fc870c696",
   "public/favicon.svg": "778ad69298b6b89045dc8b0a924f85c27bf1c48d",
   "scripts/generate-validator.mjs": "afac5049c68a8a28f07679bc1e9f1a4655da6633",
-  "src/App.tsx": "b529ab65b2639b2ad5d8196b01b07a42120d0148",
+  "src/App.tsx": "87ddaceb28e1594b7ced04869209702f955ae832",
   "src/CatalogPanel.tsx": "78a207001d19908c32df5aecb32400707cd190c3",
   "src/CutoverReadinessPanel.tsx": "78a4666a45371a0c5af5ff6ebc44909d1ad69c9b",
   "src/PwaStatus.tsx": "dcb531a4b3e2965b46a019628c4b187f7d92f5e0",
@@ -98,14 +98,14 @@ function verifyKnownFiles(dir){
 verifyKnownFiles('src');
 verifyKnownFiles('public');
 const pkg=JSON.parse(readFileSync(resolve(root,'package.json'),'utf8'));
-if(pkg.version!=='0.3.1'||
+if(pkg.version!=='0.3.2'||
    pkg.scripts.build!=='vite build'||
    pkg.scripts.prebuild!=='npm run generate:validator'||
    pkg.scripts.test!=='vitest run src'){
   fail('unreviewed production build or test scripts');
 }
 const lock=JSON.parse(readFileSync(resolve(root,'package-lock.json'),'utf8'));
-if(lock.version!=='0.3.1'||lock.packages?.['']?.version!=='0.3.1')
+if(lock.version!=='0.3.2'||lock.packages?.['']?.version!=='0.3.2')
   fail('release package and lockfile version mismatch');
 const site=resolve(root,'dist');
 // Directory traversal below fails on a missing dist; index is verified after
