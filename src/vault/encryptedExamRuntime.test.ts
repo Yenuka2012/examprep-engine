@@ -41,9 +41,10 @@ describe('M2.8 pure authenticated exam logic and guardrails',()=>{
     expect(()=>validateEncryptedExamAttempt({...complete,id:'bad ID'})).toThrow();
     expect(()=>validateEncryptedExamAttempt({...complete,answers:{UNKNOWN:['A']}})).toThrow();
     expect(()=>validateEncryptedExamAttempt({...complete,questionSnapshots:[]})).toThrow();
-    expect(()=>validateEncryptedExamAttempt({...complete,extra:'future-not-reviewed'})).not.toThrow();
-    // Backup validator allows some future attempt metadata, so the runtime
-    // must never silently reduce the copied record when preserving history.
+    expect(()=>validateEncryptedExamAttempt({...complete,extra:'future-not-reviewed'}))
+      .toThrow(/Unexpected or missing encrypted examination attempt fields/);
+    expect(()=>validateEncryptedExamAttempt(({...complete,total:undefined})))
+      .toThrow(/invalid|Unexpected or missing/i);
   });
   it('rejects unauthenticated structural fakes at construction',()=>{
     const forged={
