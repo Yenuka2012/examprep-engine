@@ -29,7 +29,7 @@ test('bank search combines title, certification, domain and no-result filters',a
   const search=page.getByLabel('Search question banks');
   await search.fill('controls');
   await expect(page.locator('.bankcard')).toHaveCount(1);
-  await expect(page.getByText('Second Controls Bank')).toBeVisible();
+  await expect(page.locator('.bankcard h4').getByText('Second Controls Bank',{exact:true})).toBeVisible();
   await search.fill('');
   await page.getByLabel('Filter banks by certification').selectOption('CRISC');
   await expect(page.locator('.bankcard')).toHaveCount(1);
