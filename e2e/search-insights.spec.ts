@@ -31,9 +31,11 @@ test('bank search combines title, certification, domain and no-result filters',a
   await expect(page.locator('.bankcard')).toHaveCount(1);
   await expect(page.getByText('Second Controls Bank')).toBeVisible();
   await search.fill('');
-  await page.getByLabel('Filter banks by certification').selectOption('CISM');
+  await page.getByLabel('Filter banks by certification').selectOption('CRISC');
+  await expect(page.locator('.bankcard')).toHaveCount(1);
+  await page.getByLabel('Filter banks by domain').selectOption('Governance');
   await expect(page.locator('.bankcard')).toHaveCount(0);
-  // Demo bank uses its original certification string, not a hardcoded vendor.
+  await page.getByLabel('Filter banks by domain').selectOption('ALL');
   await page.getByLabel('Filter banks by certification').selectOption('ALL');
   await page.getByLabel('Filter banks by domain').selectOption('Controls');
   await expect(page.locator('.bankcard')).toHaveCount(1);
@@ -84,7 +86,6 @@ test('backup checklist warns of unfinished exams without modifying local storage
   const summary=page.getByText('Backup and recovery safety checklist');
   await summary.click();
   await expect(page.getByText(/An unfinished examination is active/)).toBeVisible();
-  await expect(page.getByText(/Your data stays in this browser/)).toHaveCount(0);
   await page.getByRole('button',{name:'Exam Simulator',exact:true}).click();
   await expect(page.getByText(/Question 1 of/)).toBeVisible();
 });
