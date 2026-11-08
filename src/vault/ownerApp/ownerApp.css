@@ -1,0 +1,19 @@
+:root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#f0f4ff;background:#121b2c}
+*{box-sizing:border-box}body{margin:0}button,input,select{font:inherit}
+.owner-shell{max-width:1050px;margin:0 auto;padding:24px}
+h1{font-size:1.8rem;line-height:1.2}header p{color:#b9c8e6}.critical{padding:12px;border:1px solid #a87c50;background:#3d3025;border-radius:8px;color:#fff3df}
+section{background:#1b2941;border:1px solid #3f5270;padding:20px;border-radius:12px;margin:20px 0}
+h2{font-size:1.4rem;margin-top:0}h3{font-size:1.15rem}
+label{display:flex;flex-direction:column;gap:7px;margin:12px 0;font-weight:500}
+input,select{background:#111d32;color:white;border:1px solid #657d9f;border-radius:8px;padding:11px;max-width:100%;min-height:42px}
+button{border:1px solid #6181b5;background:#304b77;color:#fff;border-radius:8px;padding:10px 13px;cursor:pointer;min-height:42px}
+button:hover:not(:disabled){background:#4065a1}button:disabled{opacity:.5;cursor:not-allowed}
+:focus-visible{outline:3px solid #f3c369;outline-offset:3px}
+nav,.row,.questionnav{display:flex;flex-wrap:wrap;gap:9px;margin:16px 0}
+nav button{flex:0 1 auto}.questionnav button[aria-current="step"]{background:#2d825d;border-color:#7bdeac}
+fieldset{border:1px solid #60718b;border-radius:9px;margin:15px 0;padding:14px}
+.choice{display:flex;flex-direction:row;align-items:center;padding:10px;border:1px solid #3d5375;border-radius:8px}
+.choice input{min-height:auto;margin:0 10px 0 0}.error{border:1px solid #e17b7b;padding:12px;border-radius:8px;background:#4b2830}
+[role="status"]{color:#dcf2de}ul{padding-left:22px;line-height:1.7}footer{color:#b7c5dd;margin:30px 0}
+@media(max-width:620px){.owner-shell{padding:15px}section{padding:14px}
+nav button{flex:1 1 140px}.choice{align-items:flex-start}}
