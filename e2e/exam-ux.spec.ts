@@ -39,13 +39,15 @@ test('filtered navigation and cancelable submission summary preserve active exam
   await filter.selectOption('unanswered');
   await expect(page.locator('.numbergrid button')).toHaveCount(4);
   await filter.selectOption('all');
-  const message=page.waitForEvent('dialog');
+  let summary='';
+  page.once('dialog',async dialog=>{
+    summary=dialog.message();
+    await dialog.dismiss();
+  });
   await page.getByRole('button',{name:'Submit exam'}).click();
-  const dialog=await message;
-  expect(dialog.message()).toContain('Answered: 1 / 5');
-  expect(dialog.message()).toContain('Unanswered: 4');
-  expect(dialog.message()).toContain('Flagged for review: 1');
-  await dialog.dismiss();
+  expect(summary).toContain('Answered: 1 / 5');
+  expect(summary).toContain('Unanswered: 4');
+  expect(summary).toContain('Flagged for review: 1');
   await expect(page.getByText(/Question 1 of/)).toBeVisible();
   await expect(page.getByRole('button',{name:'Unflag'})).toBeVisible();
   page.once('dialog',x=>x.accept());
