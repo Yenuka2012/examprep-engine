@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'none'; img-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'" />
+  <meta name="referrer" content="no-referrer" />
+  <title>ExamPrep — Isolated Offline Encrypted Transfer Prototype</title>
+</head>
+<body>
+  <main>
+    <h1>Offline encrypted transfer prototype</h1>
+    <p class="warning">Experimental review tool — NOT an approved live migration, vault activation, restore or plaintext cleanup.</p>
+    <p>Runs only on the loopback interface. Input files and credentials are handled in browser memory. The file produced must be restored into a separately reviewed, empty encrypted-only destination. Do not upload real backup files or passwords to GitHub.</p>
+    <form id="convert-form" autocomplete="off" novalidate>
+      <label for="backup-file">Authenticated logical-v2 encrypted backup file</label>
+      <input id="backup-file" type="file" accept=".json,application/json" required />
+      <label for="backup-credential">Existing encrypted backup passphrase</label>
+      <input id="backup-credential" type="password" autocomplete="off" required />
+      <label for="master-credential">New vault master passphrase</label>
+      <input id="master-credential" type="password" autocomplete="new-password" required />
+      <label for="recovery-credential">Separate vault recovery credential</label>
+      <input id="recovery-credential" type="password" autocomplete="new-password" required />
+      <button id="convert" type="submit">Convert encrypted backup locally</button>
+    </form>
+    <p id="status" role="status" aria-live="polite">No file processed. The production IndexedDB is never opened here.</p>
+    <p>All user-controlled input is treated as untrusted. Exported logical-v2 backups exclude unfinished examinations. Finish and verify an active exam before relying on backup recovery.</p>
+  </main>
+  <script type="module" src="/src/vault/offlineConverterUi.ts"></script>
+</body>
+</html>
