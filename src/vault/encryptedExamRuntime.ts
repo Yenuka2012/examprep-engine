@@ -31,6 +31,13 @@ const RECORD_FORMAT='examprep-encrypted-exam-record-v1' as const;
 const SLOT_FORMAT='examprep-encrypted-active-slot-v1' as const;
 const IMPORT_FORMAT='examprep-offline-v2-source-record-v1' as const;
 const IMPORT_SOURCE='examprep-authenticated-logical-v2-backup' as const;
+const ATTEMPT_FIELDS=[
+  'id','bankId','bankTitle','certification','startedAt','completedAt',
+  'durationSeconds','answers','questionSnapshots','correctCount','total'
+] as const;
+// One queue per cryptographically authenticated owner session, even when
+// two UI adapters share the same session inside a single unlocked tab.
+const ownerSerialQueues=new WeakMap<OwnerVaultSession,Promise<void>>();
 
 type Category='bank'|'attempt'|'certification'|'syllabus';
 type Storable={bank:QuestionBank;attempt:Attempt;certification:CertificationProfile;syllabus:SyllabusVersion};
@@ -62,6 +69,8 @@ function canonical(value:unknown):string{
 const identical=(a:unknown,b:unknown)=>canonical(a)===canonical(b);
 
 export function validateEncryptedExamAttempt(raw:unknown):Attempt{
+  assert(object(raw)&&fields(raw,ATTEMPT_FIELDS),
+    'Unexpected or missing encrypted examination attempt fields');
   const checked=validateBackupData({
     backup_version:2,exported_at:'2026-11-09T00:00:00.000Z',
     banks:[],attempts:[raw],certifications:[],syllabi:[]
@@ -180,7 +189,6 @@ function parseSlot(value:unknown):Slot{
 export class EncryptedExamRuntime{
   readonly #owner:OwnerVaultSession;
   readonly #phase:VerifiedDestinationBinding['destination'];
-  #tail:Promise<void>=Promise.resolve();
   constructor(binding:VerifiedDestinationBinding){
     if(!(binding?.owner instanceof OwnerVaultSession)||!binding.owner.active||
        binding.destination?.phase!=='ENCRYPTED_ONLY'){
@@ -199,17 +207,22 @@ export class EncryptedExamRuntime{
    * repository's authenticated CAS defend across other runtime instances.
    */
   async #serial<T>(fn:()=>Promise<T>):Promise<T>{
-    const before=this.#tail;
+    const before=ownerSerialQueues.get(this.#owner)??Promise.resolve();
     let release!:()=>void;
-    this.#tail=new Promise<void>(resolve=>{release=resolve;});
+    ownerSerialQueues.set(this.#owner,new Promise<void>(resolve=>{release=resolve;}));
     await before;
     try{this.#live();const result=await fn();this.#live();return result;}
     finally{release();}
   }
   async #slot():Promise<{value:Slot;nonce:string}|null>{
     this.#live();
-    const row=await this.#owner.read(ACTIVE_SLOT_ID);
+    const rows=await this.#owner.listByType('active-session');
     this.#live();
+    // A legacy or partially migrated active session is NOT equivalent to
+    // our single CAS slot. Refuse to hide it and start a second exam.
+    assert(rows.length<=1&&rows.every(row=>row.recordId===ACTIVE_SLOT_ID),
+      'Unexpected encrypted active-session records; recovery review required');
+    const row=rows[0];
     if(!row)return null;
     assert(row.recordType==='active-session','Encrypted active-slot type mismatch');
     return {value:parseSlot(row.value),nonce:row.nonce};
