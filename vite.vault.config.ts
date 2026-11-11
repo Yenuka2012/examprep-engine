@@ -11,7 +11,7 @@ export default defineConfig({
   build:{
     outDir:'dist-vault-test',
     sourcemap:false,
-    rollupOptions:{input:'vault-harness.html'}
+    rollupOptions:{input:['vault-harness.html','runtime-harness.html','encrypted-owner.html']}
   },
   preview:{host:'127.0.0.1',port:4174,strictPort:true}
 });
