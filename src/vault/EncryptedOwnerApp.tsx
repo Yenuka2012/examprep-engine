@@ -149,7 +149,7 @@ export default function EncryptedOwnerApp(){
       const recovery=recoveryRef.current?.value??'';
       const b=method==='enroll'
         ?await enrollEncryptedDestination(repository,master,recovery,options())
-        :await unlockEncryptedDestination(repository,master,method,options());
+        :await unlockEncryptedDestination(repository,method==='recovery'?recovery:master,method,options());
       binding.current=b;
       runtime.current=new EncryptedExamRuntime(b);
       await refresh();
