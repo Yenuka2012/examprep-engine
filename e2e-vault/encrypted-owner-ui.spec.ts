@@ -17,7 +17,7 @@ test('encrypted-only owner UI: import, durable exam, history, lock and re-unlock
   await enroll(page);
   await page.getByLabel('Import question bank').setInputFiles(DEMO);
   await expect(page.getByText('1 encrypted bank(s)')).toBeVisible();
-  await page.getByRole('button',{name:'Practice'}).click();
+  await page.getByRole('button',{name:'Practice',exact:true}).click();
   await page.getByRole('button',{name:'Start encrypted exam'}).click();
   await expect(page.getByRole('heading',{name:/Question 1:/})).toBeVisible();
   await page.getByRole('radio',{name:/B\. To identify and evaluate risks/}).check();
