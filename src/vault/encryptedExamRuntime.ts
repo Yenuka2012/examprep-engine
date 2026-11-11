@@ -280,6 +280,14 @@ export class EncryptedExamRuntime{
     const {session,attempt,attemptRecordId}=slot.value;
     assert(matchingDurableAttempt(session,attempt),
       'Prepared exam differs from durably computed result');
+    // A restored attempt with the SAME logical exam ID but a different
+    // ciphertext UUID must never be duplicated during recovery. An orphan
+    // prepared intent is not permission to append a second attempt.
+    const colliding=(await this.#records('attempt'))
+      .filter(item=>item.value.id===session.id);
+    assert(colliding.every(item=>
+      item.row.recordId===attemptRecordId&&identical(item.value,attempt)
+    ),'Duplicate encrypted attempt identity; recovery review required');
     const existing=await this.#owner.read(attemptRecordId);
     this.#live();
     if(existing){
@@ -332,6 +340,13 @@ export class EncryptedExamRuntime{
         'An encrypted examination is already in progress');
       assert(!(await this.#records('attempt')).some(x=>x.value.id===session.id),
         'Cannot reuse the ID of a completed examination');
+      // A submitted source session cannot invent a question bank: the full
+      // immutable source bank must already exist in authenticated ciphertext.
+      // This also rejects an altered bank with a reused bank_id.
+      const storedBanks=await this.#records('bank');
+      assert(storedBanks.some(x=>
+        x.value.bank_id===session.bank.bank_id&&identical(x.value,session.bank)
+      ),'Examination bank missing or differs from encrypted vault');
       const saved=await this.#owner.save('active-session',{
         format:SLOT_FORMAT,phase:'active',session
       } satisfies ActiveSlot,prior

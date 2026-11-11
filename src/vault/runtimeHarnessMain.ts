@@ -109,6 +109,32 @@ export const m28={
     const ctx=checked();
     return ctx.runtime.startExam(fixtureSession());
   },
+  async startWithModifiedBank(){
+    const ctx=checked(),session=fixtureSession();
+    const modifiedBank={...session.bank,title:session.bank.title+' changed'};
+    return ctx.runtime.startExam({
+      ...session,bank:modifiedBank,
+      questions:modifiedBank.questions
+    });
+  },
+  async injectDuplicateAttemptForPreparedIntent(){
+    const ctx=checked();
+    const slot=await ctx.owner.read(ACTIVE_SLOT_ID);
+    if(!slot||!slot.value||typeof slot.value!=='object'||
+       !('phase' in slot.value)||slot.value.phase!=='preparing'){
+      throw new Error('Synthetic preparing intent required');
+    }
+    if(!('attempt' in slot.value)||!slot.value.attempt||
+       typeof slot.value.attempt!=='object'){
+      throw new Error('Malformed synthetic preparing attempt');
+    }
+    const attempt=slot.value.attempt as Attempt;
+    await ctx.owner.save('attempt',{
+      format:'examprep-encrypted-exam-record-v1',
+      logicalId:attempt.id,value:attempt
+    });
+    return 'conflicting-attempt-id-in-different-ciphertext-record';
+  },
   async resume(){return checked().runtime.resumeExam();},
   async answer(){
     const ctx=checked(),current=await ctx.runtime.resumeExam();
