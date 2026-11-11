@@ -69,6 +69,15 @@ function walk(file){
   }
 }
 walk(entry);
+// M2.9: validate the complete separate React owner entrypoint as well.
+// No old IndexedDB adapter, source-write permit or dynamic import may appear
+// anywhere in the transitive encrypted owner UI dependency graph.
+walk(resolve(root,'src/vault/encryptedOwnerMain.tsx'));
+if(!visited.has('src/vault/EncryptedOwnerApp.tsx')||
+   !visited.has('src/vault/verifiedDestinationBridge.ts')||
+   !visited.has('src/vault/storage.ts')){
+  fail('encrypted-only owner UI is not bound to the reviewed repository/session');
+}
 if(!visited.has('src/catalogValidation.ts')||
    !visited.has('src/backup.ts')||
    visited.has('src/db.ts')){
