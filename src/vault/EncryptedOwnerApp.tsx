@@ -127,6 +127,15 @@ export default function EncryptedOwnerApp(){
   },[phase,exam?.session.id]);
   const remaining=exam?Math.max(0,Math.ceil((exam.session.endsAt-now)/1000)):0;
   useEffect(()=>{
+    if(phase!=='unlocked'||saveState==='saved')return;
+    const warn=(event:BeforeUnloadEvent)=>{
+      event.preventDefault();
+      event.returnValue='';
+    };
+    window.addEventListener('beforeunload',warn);
+    return()=>window.removeEventListener('beforeunload',warn);
+  },[phase,saveState]);
+  useEffect(()=>{
     if(phase==='unlocked'&&exam&&remaining===0&&!submitting.current){
       void submit(true);
     }
