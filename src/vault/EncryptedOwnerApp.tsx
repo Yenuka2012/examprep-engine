@@ -177,18 +177,16 @@ export default function EncryptedOwnerApp(){
     }
   }
   async function lock(){
-    if(busy)return;
+    const active=binding.current;
+    if(!active)return;
+    if(saveState!=='saved'&&!window.confirm(
+      'Recent changes may not be durably saved. Lock now and verify them after unlocking?'
+    ))return;
     setBusy(true);
     try{
-      // Manual lock tries to commit the latest draft first. Background/pagehide
-      // still fail closed and redact immediately via owner lifecycle.
-      await tail.current;
-      if(draft.current&&committed.current){
-        const rt=ctx();
-        const saved=await rt.saveExam(draft.current.session,committed.current.nonce);
-        committed.current=saved;
-      }
-      await binding.current?.destination.lock();
+      // Security-critical: redaction must not wait for a failed/stuck autosave.
+      // The owner session drains accepted encrypted writes behind its lock.
+      await active.destination.lock();
     }catch(e){setError(fail(e));setBusy(false);}
   }
   async function importJson(file:File|undefined,category:Category){
@@ -258,7 +256,7 @@ export default function EncryptedOwnerApp(){
     const bank=banks.find(b=>b.bank_id===selectedBank)||banks[0];
     if(!bank){setError('Import an encrypted question bank first.');return;}
     if(!Number.isInteger(minutes)||minutes<1||minutes>300||
-       !Number.isInteger(questionCount)||questionCount<1||questionCount>bank.questions.length){
+       !Number.isInteger(questionCount)||questionCount<1){
       setError('Choose a valid question count and duration.');return;
     }
     setBusy(true);setError('');
@@ -266,7 +264,7 @@ export default function EncryptedOwnerApp(){
       const startedAt=new Date().toISOString();
       const session:ExamSession={
         id:crypto.randomUUID(),bank:copy(bank),
-        questions:copy(bank.questions.slice(0,questionCount)),
+        questions:copy(bank.questions.slice(0,Math.min(questionCount,bank.questions.length))),
         answers:{},marked:[],index:0,startedAt,
         endsAt:Date.parse(startedAt)+minutes*60_000,durationSeconds:minutes*60
       };
@@ -323,7 +321,7 @@ export default function EncryptedOwnerApp(){
       <p>Store a unique master password and a separate recovery password safely. Losing both credentials makes recovery impossible.</p>
       <form onSubmit={e=>{e.preventDefault();void open(phase==='setup'?'enroll':'master');}}>
         <label>Master password <input ref={masterRef} type="password" autoComplete={phase==='setup'?'new-password':'current-password'} required minLength={12}/></label>
-        {phase==='setup'&&<label>Independent recovery password <input ref={recoveryRef} type="password" autoComplete="new-password" required minLength={12}/></label>}
+        <label>{phase==='setup'?'Independent recovery password':'Recovery password (for recovery unlock)'} <input ref={recoveryRef} type="password" autoComplete={phase==='setup'?'new-password':'current-password'} required={phase==='setup'} minLength={12}/></label>
         <button type="submit" disabled={busy}>{phase==='setup'?'Create encrypted vault':'Unlock with master'}</button>
         {phase==='locked'&&<button type="button" disabled={busy} onClick={()=>void open('recovery')}>Unlock with recovery</button>}
       </form>
@@ -341,7 +339,7 @@ export default function EncryptedOwnerApp(){
           <button key={key} disabled={busy} aria-current={view===key?'page':undefined} onClick={()=>setView(key)}>
             {key==='banks'?'Manage Content':key==='exam'?'Exam Practice':key==='history'?'Results':key==='catalog'?'Certifications':'Backup'}
           </button>)}
-        <button onClick={()=>void lock()} disabled={busy||saveState==='saving'||saveState==='failed'}>Lock vault</button>
+        <button onClick={()=>void lock()}>Lock vault</button>
       </nav>
       {view==='banks'&&<section>
         <h2>Encrypted question banks</h2>
