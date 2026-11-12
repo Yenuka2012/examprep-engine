@@ -1,5 +1,5 @@
 import {isCorrect,validateBank} from './logic';
-import {validateCertification,validateSyllabus} from './catalog';
+import {validateCertification,validateSyllabus} from './catalogValidation';
 import type {Attempt,QuestionBank,CertificationProfile,SyllabusVersion} from './types';
 
 type BackupCore={exported_at:string;banks:QuestionBank[];attempts:Attempt[]};
