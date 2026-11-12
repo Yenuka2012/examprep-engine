@@ -3,10 +3,7 @@
  * synthetic scope. NO network, data, IndexedDB, or real browser owner profile.
  */
 import {describe,it,expect} from 'vitest';
-import {readFileSync} from 'node:fs';
-import {webcrypto} from 'node:crypto';
-
-const source=readFileSync(new URL('./ownerStagingSw.js',import.meta.url),'utf8');
+import source from './ownerStagingSw.js?raw';
 const origin='https://exam.staging.example';
 const entries=[
   {url:'owner-staging.html',revision:'synthetic-html-v1'},
@@ -53,7 +50,7 @@ function harness(manifest:unknown=entries){
   if(instrumented===source)throw Error('Missing Workbox manifest injection point');
   // Execute only the checked-in JS source, in a closed synthetic worker scope.
   const compile=new Function('self','caches','crypto','TextEncoder','Request','URL','fetch',instrumented);
-  compile(hooks,caches,webcrypto,TextEncoder,Request,URL,fetcher);
+  compile(hooks,caches,globalThis.crypto,TextEncoder,Request,URL,fetcher);
   async function emit(name:string,request?:Request){
     const handler=handlers.get(name);
     if(!handler)throw Error('Missing '+name+' event handler');
