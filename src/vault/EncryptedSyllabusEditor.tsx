@@ -35,8 +35,6 @@ export default function EncryptedSyllabusEditor({runtime,certifications,banks,on
   const [error,setError]=useState('');
   const [notice,setNotice]=useState('');
   const [loaded,setLoaded]=useState(false);
-  const [generation,setGeneration]=useState(0);
-  const [active,setActive]=useState(true);
   useEffect(()=>{
     let alive=true;
     void runtime.listSyllabusRevisions().then(result=>{
