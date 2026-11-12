@@ -17,6 +17,7 @@ import {EXAM_PRESETS,examOverview,examTimeNotice,navigatorItems,submissionReview
 import {MAX_VAULT_TRANSFER_BYTES} from './transfer';
 import {restoreValidatedConvertedDestinationIntoEmpty} from './validatedConvertedRestore';
 import OriginTopologyPanel from './OriginTopologyPanel';
+import EncryptedSyllabusEditor from './EncryptedSyllabusEditor';
 import type {QuestionBank,Attempt,ExamSession,CertificationProfile,SyllabusVersion} from '../types';
 import './encryptedOwner.css';
 
@@ -492,7 +493,9 @@ export default function EncryptedOwnerApp(){
         <ul>{certifications.map(c=><li key={c.id}>{c.provider} — {c.name}</li>)}</ul>
         <h3>Syllabus versions ({syllabi.length})</h3>
         <ul>{syllabi.map(s=><li key={s.id}>{s.title} — {s.version} ({s.status})</li>)}</ul>
-      </section>}
+        {runtime.current&&<EncryptedSyllabusEditor runtime={runtime.current}
+          certifications={certifications} banks={banks} onSaved={refresh}/>}
+      </section>
       {view==='exam'&&<section>
         <h2>Exam Practice</h2>
         {!exam&&<div>
