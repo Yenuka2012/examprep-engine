@@ -14,4 +14,4 @@ if(!verdict.allowed||!window.isSecureContext||window.location.protocol!=='https:
 }
 const mount=document.getElementById('encrypted-owner');
 if(!mount)throw new Error('Missing encrypted-owner staging root');
-createRoot(mount).render(<EncryptedOwnerApp/>);
+createRoot(mount).render(<EncryptedOwnerApp enableOfflinePwaStatus/>);
