@@ -520,7 +520,7 @@ export default function EncryptedOwnerApp(){
           <a href="/offline-converter.html">Open isolated converter preview</a>.
           Never use real owner backups with this experimental build.</p>
         <OriginTopologyPanel/>
-      </section>
+      </section>}
     </div>}
     <footer>Isolated M2.9 phase 1 — not production, not approved for real-owner cutover. Original v0.3.2 Pages storage is untouched.</footer>
   </main>;
