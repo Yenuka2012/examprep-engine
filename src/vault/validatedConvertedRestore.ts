@@ -28,7 +28,7 @@ export async function restoreValidatedConvertedDestinationIntoEmpty(
   options:OwnerSessionOptions={}
 ):Promise<ValidatedConvertedRestore>{
   if(typeof master!=='string'||typeof recovery!=='string'||
-     master===recovery||master.length<12||recovery.length<12){
+     master===recovery||master.length<16||recovery.length<16){
     throw new Error('Distinct master and recovery credentials are required for verified restore');
   }
   // Both credentials MUST independently authenticate every encrypted source
