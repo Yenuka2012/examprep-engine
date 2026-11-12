@@ -20,6 +20,7 @@ import {validateBank,isCorrect} from '../logic';
 import {validateExamSession} from '../examValidation';
 import {validateBackupData} from '../backup';
 import {validateCertification,validateSyllabus} from '../catalogValidation';
+import {newDraft,nextDraft,publishedDraft} from './syllabusLifecycle';
 import type {
   Attempt,ExamSession,QuestionBank,CertificationProfile,SyllabusVersion
 } from '../types';
@@ -48,6 +49,11 @@ type CompleteSlot={format:typeof SLOT_FORMAT;phase:'complete';lastSessionId:stri
 type Slot=ActiveSlot|PreparingSlot|CompleteSlot;
 export type ActiveExamRevision={session:ExamSession;nonce:string};
 export type EncryptedRecordRevision={recordId:string;nonce:string};
+export type EncryptedSyllabusRevision=EncryptedRecordRevision&{
+  syllabus:SyllabusVersion;
+};
+/** Nonce and logical revision from a previously authenticated read. */
+export type ExpectedSyllabusRevision=EncryptedRecordRevision&{revision:number};
 
 const object=(v:unknown):v is Record<string,unknown> =>
   v!==null&&typeof v==='object'&&!Array.isArray(v);
@@ -251,6 +257,74 @@ export class EncryptedExamRuntime{
   }
   listSyllabi():Promise<SyllabusVersion[]>{
     return this.#serial(async()=>(await this.#records('syllabus')).map(item=>item.value));
+  }
+  /**
+   * Authenticated revision metadata. Tokens never get persisted as plaintext
+   * application records, and may be used for precisely one CAS update.
+   */
+  listSyllabusRevisions():Promise<EncryptedSyllabusRevision[]>{
+    return this.#serial(async()=>{
+      const rows=await this.#records('syllabus');
+      return rows.map(({row,value})=>({
+        syllabus:copy(value),recordId:row.recordId,nonce:row.nonce
+      }));
+    });
+  }
+  /**
+   * Draft creation is add-only; an existing ID always requires a previously
+   * authenticated nonce+revision tuple. No silent edits of imported versions.
+   */
+  saveSyllabusDraft(raw:unknown,expected?:ExpectedSyllabusRevision):
+      Promise<EncryptedSyllabusRevision>{
+    return this.#serial(async()=>{
+      const proposal=validateCategory('syllabus',raw);
+      const certs=await this.#records('certification');
+      assert(certs.some(item=>item.value.id===proposal.certificationId),
+        'Parent certification not present in encrypted vault');
+      const rows=await this.#records('syllabus');
+      const original=rows.find(row=>row.value.id===proposal.id);
+      if(!original){
+        assert(expected===undefined,'Missing syllabus draft; stale edit rejected');
+        const initial=newDraft(proposal);
+        const saved=await this.#owner.save('syllabus',wrap('syllabus',initial));
+        this.#live();
+        return {syllabus:copy(initial),...saved};
+      }
+      assert(expected!==undefined&&
+        expected.recordId===original.row.recordId&&
+        expected.nonce===original.row.nonce&&
+        expected.revision===original.value.revision,
+        'Stale syllabus draft token; reload before editing');
+      const next=nextDraft(original.value,proposal,expected.revision);
+      const saved=await this.#owner.save('syllabus',wrap('syllabus',next),{
+        recordId:original.row.recordId,expectedNonce:expected.nonce
+      });
+      this.#live();
+      return {syllabus:copy(next),...saved};
+    });
+  }
+  /**
+   * Publishing uses the SAME authenticated CAS guard as editing; published
+   * ciphertext is never edited, even when called with a formerly valid nonce.
+   */
+  publishSyllabusVersion(id:string,expected:ExpectedSyllabusRevision):
+      Promise<EncryptedSyllabusRevision>{
+    return this.#serial(async()=>{
+      const original=(await this.#records('syllabus')).find(row=>row.value.id===id);
+      assert(original,'Syllabus draft missing; reload before publishing');
+      assert(expected?.recordId===original.row.recordId&&
+        expected?.nonce===original.row.nonce&&
+        expected?.revision===original.value.revision,
+        'Stale syllabus publication token; reload before publishing');
+      const final=publishedDraft(
+        original.value,expected.revision,new Date().toISOString()
+      );
+      const saved=await this.#owner.save('syllabus',wrap('syllabus',final),{
+        recordId:original.row.recordId,expectedNonce:expected.nonce
+      });
+      this.#live();
+      return {syllabus:copy(final),...saved};
+    });
   }
   async #add<K extends Category>(category:K,value:unknown):Promise<EncryptedRecordRevision>{
     const validated=validateCategory(category,value);
