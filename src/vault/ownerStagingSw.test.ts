@@ -76,6 +76,7 @@ describe('M2.9 Phase 3C static-only owner service worker',()=>{
       {url:'api/questions',revision:'x'}
     ];
     for(const entry of bad)expect(()=>harness([...entries,entry])).toThrow(/Unapproved/);
+    expect(()=>harness([...entries,entries[0]])).toThrow(/duplicate/);
   });
   it('installs only the app shell and intentionally has no update-message handler',async()=>{
     const h=harness();
