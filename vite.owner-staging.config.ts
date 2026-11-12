@@ -21,7 +21,10 @@ export default defineConfig(()=>{
         filename:'ownerStagingSw.js',
         injectRegister:false,
         registerType:'prompt',
-        includeAssets:['favicon.svg'],
+        // Manifest icons are precached explicitly through the restricted
+        // glob allowlist below; do not auto-add duplicates.
+        includeAssets:[],
+        includeManifestIcons:false,
         manifest:{
           id:'/owner-staging.html',
           name:'ExamPrep Engine — Encrypted Owner Staging',
