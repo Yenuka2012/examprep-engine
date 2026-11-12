@@ -422,8 +422,8 @@ export default function EncryptedOwnerApp({PwaStatus}:{
       <h2>{phase==='setup'?'Set up encrypted vault':'Unlock encrypted vault'}</h2>
       <p>Store a unique master password and a separate recovery password safely. Losing both credentials makes recovery impossible.</p>
       <form onSubmit={e=>{e.preventDefault();void open(phase==='setup'?'enroll':'master');}}>
-        <label>Master password <input ref={masterRef} type="password" autoComplete={phase==='setup'?'new-password':'current-password'} required minLength={12}/></label>
-        <label>{phase==='setup'?'Independent recovery password':'Recovery password (for recovery unlock)'} <input ref={recoveryRef} type="password" autoComplete={phase==='setup'?'new-password':'current-password'} required={phase==='setup'} minLength={12}/></label>
+        <label>Master password <input ref={masterRef} type="password" autoComplete={phase==='setup'?'new-password':'current-password'} required minLength={16}/></label>
+        <label>{phase==='setup'?'Independent recovery password':'Recovery password (for recovery unlock)'} <input ref={recoveryRef} type="password" autoComplete={phase==='setup'?'new-password':'current-password'} required={phase==='setup'} minLength={16}/></label>
         <button type="submit" disabled={busy}>{phase==='setup'?'Create encrypted vault':'Unlock with master'}</button>
         {phase==='locked'&&<button type="button" disabled={busy} onClick={()=>void open('recovery')}>Unlock with recovery</button>}
       </form>
