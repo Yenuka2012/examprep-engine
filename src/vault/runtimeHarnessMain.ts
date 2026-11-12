@@ -77,6 +77,40 @@ export const m28={
     await ctx.runtime.addBank(syntheticLegacyFixture().banks[0]);
     return (await ctx.runtime.listBanks()).length;
   },
+  async createCatalogDraft(){
+    const rt=checked().runtime;
+    await rt.addCertification({
+      id:'P3B',name:'Synthetic phase 3B',
+      provider:'TEST ONLY',createdAt:new Date().toISOString()
+    });
+    const now=new Date().toISOString();
+    return rt.saveSyllabusDraft({
+      id:'P3B/2026',certificationId:'P3B',version:'2026',
+      title:'Synthetic draft encrypted',status:'draft',revision:1,
+      createdAt:now,updatedAt:now,
+      domains:[{code:'D1',name:'Information security',weight:100,objectives:['Synthetic']}]
+    });
+  },
+  async catalogCurrent(){
+    const rows=await checked().runtime.listSyllabusRevisions();
+    return rows.find(row=>row.syllabus.id==='P3B/2026')??null;
+  },
+  async catalogRevise(expected:{
+    recordId:string;nonce:string;revision:number
+  },newTitle:string){
+    const rt=checked().runtime;
+    const current=(await rt.listSyllabusRevisions()).find(x=>x.syllabus.id==='P3B/2026');
+    if(!current)throw new Error('Missing synthetic draft');
+    return rt.saveSyllabusDraft({
+      ...current.syllabus,title:newTitle,revision:current.syllabus.revision+1,
+      updatedAt:new Date().toISOString()
+    },expected);
+  },
+  async catalogPublish(expected:{
+    recordId:string;nonce:string;revision:number
+  }){
+    return checked().runtime.publishSyllabusVersion('P3B/2026',expected);
+  },
   async importConvertedBank(){
     const ctx=checked(),bank=syntheticLegacyFixture().banks[0];
     await ctx.owner.save('bank',{
