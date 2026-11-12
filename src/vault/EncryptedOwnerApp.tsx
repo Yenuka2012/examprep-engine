@@ -3,7 +3,7 @@
  * This file must NEVER be imported by the ordinary GitHub Pages entrypoint.
  * No source IndexedDB, localStorage, sessionStorage, or plaintext fallback.
  */
-import {useEffect,useMemo,useRef,useState} from 'react';
+import {useEffect,useMemo,useRef,useState,type ComponentType} from 'react';
 import {flushSync} from 'react-dom';
 import {
   enrollEncryptedDestination,unlockEncryptedDestination,
@@ -18,6 +18,7 @@ import {MAX_VAULT_TRANSFER_BYTES} from './transfer';
 import {restoreValidatedConvertedDestinationIntoEmpty} from './validatedConvertedRestore';
 import OriginTopologyPanel from './OriginTopologyPanel';
 import EncryptedSyllabusEditor from './EncryptedSyllabusEditor';
+import type {OwnerPwaSafety} from './ownerPwaPolicy';
 import type {QuestionBank,Attempt,ExamSession,CertificationProfile,SyllabusVersion} from '../types';
 import './encryptedOwner.css';
 
@@ -29,7 +30,9 @@ const copy=<T,>(item:T):T=>JSON.parse(JSON.stringify(item)) as T;
 const sec=(v:number)=>Math.floor(Math.max(0,v)/60).toString().padStart(2,'0')+':'+Math.floor(Math.max(0,v)%60).toString().padStart(2,'0');
 const fail=(e:unknown)=>e instanceof Error?e.message:'Encrypted operation failed; preserve the current browser profile.';
 
-export default function EncryptedOwnerApp(){
+export default function EncryptedOwnerApp({PwaStatus}:{
+  PwaStatus?:ComponentType<{security:OwnerPwaSafety}>
+}={}){
   const repository=useMemo(()=>new ExperimentalVaultRepository(),[]);
   const binding=useRef<VerifiedDestinationBinding|null>(null);
   const runtime=useRef<EncryptedExamRuntime|null>(null);
@@ -410,6 +413,8 @@ export default function EncryptedOwnerApp(){
     <header><h1>ExamPrep Engine — Owner Vault</h1>
       <p>Encrypted-only preview. Local cryptographic unlock is not server login; no production source data is read.</p>
       <p role="status">Vault: {phase}{phase==='unlocked'?' · exclusive owner lock':''}</p></header>
+    {PwaStatus&&<PwaStatus security={{phase,examActive:!!exam,
+      writesSettled:saveState==='saved'&&!busy}}/>}
     {error&&<p role="alert" className="owner-error">{error}</p>}
     {message&&<p role="status">{message}</p>}
     {phase==='checking'&&<p role="status">Checking encrypted vault metadata…</p>}
