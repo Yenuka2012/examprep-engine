@@ -588,6 +588,37 @@ export default function EncryptedOwnerApp(){
           </details>)}
         </article>}
       </section>}
+      {view==='insights'&&<section>
+        <h2>Learning insights</h2>
+        <p>Calculated locally from decrypted in-memory snapshots while this vault is unlocked;
+          no telemetry, server sync or additional plaintext persistence.</p>
+        <div className="owner-insights-grid" aria-label="Study summary">
+          <p><strong>{summary.banks}</strong> question banks</p>
+          <p><strong>{summary.questionCount}</strong> available questions</p>
+          <p><strong>{summary.completed}</strong> completed examinations</p>
+          <p><strong>{summary.accuracyPercent}%</strong> sampled accuracy
+            ({summary.correct}/{summary.evaluated})</p>
+        </div>
+        <h3>Domain performance</h3>
+        {analytics.length===0?<p>No completed exam samples yet.</p>:
+        <table className="owner-insights-table">
+          <thead><tr><th scope="col">Certification and domain</th>
+            <th scope="col">Correct</th><th scope="col">Sampled</th>
+            <th scope="col">Accuracy</th></tr></thead>
+          <tbody>{analytics.map(m=><tr key={m.name}>
+            <th scope="row">{m.name}</th><td>{m.correct}</td>
+            <td>{m.total}</td><td>{Math.round(m.correct*100/m.total)}%</td>
+          </tr>)}</tbody>
+        </table>}
+        <h3>Review priorities</h3>
+        <p>Only domains with at least five attempted questions are considered.
+          These are practice indicators, not certification readiness predictions.</p>
+        {priorities.length===0?<p>At least five questions in one domain are required
+          before prioritization is meaningful.</p>:
+        <ol>{priorities.map(m=><li key={m.name}>
+          {m.name}: {m.correct}/{m.total} correct
+        </li>)}</ol>}
+      </section>}
       {view==='backup'&&<section>
         <h2>Authenticated encrypted recovery</h2>
         <p>Export only ciphertext. No exam content is transmitted to GitHub or another server by this interface.</p>
@@ -599,6 +630,6 @@ export default function EncryptedOwnerApp(){
         <OriginTopologyPanel/>
       </section>}
     </div>}
-    <footer>Isolated M2.9 phase 1 — not production, not approved for real-owner cutover. Original v0.3.2 Pages storage is untouched.</footer>
+    <footer>Isolated M2.9 Phase 3 development preview — not production, not approved for owner cutover. Original v0.3.2 Pages data remains untouched.</footer>
   </main>;
 }
