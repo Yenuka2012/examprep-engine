@@ -14,6 +14,8 @@ import {EncryptedExamRuntime,type ActiveExamRevision} from './encryptedExamRunti
 import {filterQuestionBanks,filterAttemptHistory,attemptReview,type ScoreBand} from '../learningInsights';
 import {EXAM_PRESETS,examOverview,examTimeNotice,navigatorItems,submissionReview,type NavigatorFilter} from '../examUx';
 import {MAX_VAULT_TRANSFER_BYTES} from './transfer';
+import {restoreValidatedConvertedDestinationIntoEmpty} from './validatedConvertedRestore';
+import OriginTopologyPanel from './OriginTopologyPanel';
 import type {QuestionBank,Attempt,ExamSession,CertificationProfile,SyllabusVersion} from '../types';
 import './encryptedOwner.css';
 
@@ -185,6 +187,43 @@ export default function EncryptedOwnerApp(){
       setBusy(false);
     }
   }
+  async function restoreConverted(file:File|undefined){
+    if(!file||busy)return;
+    setBusy(true);setError('');setMessage('');
+    try{
+      if(file.size<1||file.size>MAX_VAULT_TRANSFER_BYTES)
+        throw new Error('Converted encrypted transfer exceeds 64 MiB size limit.');
+      const raw:unknown=JSON.parse(await file.text());
+      const master=masterRef.current?.value??'';
+      const recovery=recoveryRef.current?.value??'';
+      // Independent validation of EVERY ciphertext source record and its
+      // provenance with both credentials precedes empty-DB restoration.
+      const result=await restoreValidatedConvertedDestinationIntoEmpty(
+        repository,raw,master,recovery,options()
+      );
+      binding.current=result.binding;
+      runtime.current=new EncryptedExamRuntime(result.binding);
+      await refresh();
+      setPhase('unlocked');
+      const counts=result.inventory.counts;
+      setMessage('Verified converted ciphertext restored: '+
+        counts.banks+' banks, '+counts.attempts+' attempts, '+
+        counts.certifications+' certifications, '+counts.syllabi+
+        ' syllabi. Verify sample scores and independent recovery.');
+    }catch(e){
+      // A failed restore NEVER deletes the original source or ciphertext.
+      // If a post-restore display error occurs, close the active key and
+      // leave the recovered vault intact for manual investigation.
+      const active=binding.current;
+      if(active)await active.owner.lock().catch(()=>undefined);
+      setError(fail(e));
+    }finally{
+      if(restoreRef.current)restoreRef.current.value='';
+      if(masterRef.current)masterRef.current.value='';
+      if(recoveryRef.current)recoveryRef.current.value='';
+      setBusy(false);
+    }
+  }
   async function lock(){
     const active=binding.current;
     if(!active)return;
@@ -340,7 +379,15 @@ export default function EncryptedOwnerApp(){
         <input ref={restoreRef} type="file" accept=".json,application/json" aria-label="Encrypted vault backup"/>
         <button disabled={busy} onClick={()=>void restore(restoreRef.current?.files?.[0],'master')}>Restore with master</button>
         <button disabled={busy} onClick={()=>void restore(restoreRef.current?.files?.[0],'recovery')}>Restore with recovery</button>
+        <h4>Converted logical-v2 encrypted source transfer</h4>
+        <p>For an offline-converted transfer only. Requires BOTH independent vault
+          credentials, authenticates the original inventory and restores only
+          to an empty vault. This experimental preview is not approved for real owner backups.</p>
+        <button disabled={busy} onClick={()=>void restoreConverted(restoreRef.current?.files?.[0])}>
+          Verify both credentials and restore converted transfer
+        </button>
       </section>}
+      {phase==='setup'&&<OriginTopologyPanel/>}
     </section>}
     {phase==='unlocked'&&<div className="owner-workspace">
       <nav aria-label="Owner workspace">
@@ -469,7 +516,11 @@ export default function EncryptedOwnerApp(){
         <p>Export only ciphertext. No exam content is transmitted to GitHub or another server by this interface.</p>
         <button disabled={busy||saveState!=='saved'} onClick={()=>void exportEncrypted()}>Download encrypted vault backup</button>
         <p>Before using this for real data, separately verify master-password and recovery-password restoration in independent empty profiles. The existing source browser must be preserved.</p>
-      </section>}
+        <p>Test-only offline converter (loopback only):
+          <a href="/offline-converter.html">Open isolated converter preview</a>.
+          Never use real owner backups with this experimental build.</p>
+        <OriginTopologyPanel/>
+      </section>
     </div>}
     <footer>Isolated M2.9 phase 1 — not production, not approved for real-owner cutover. Original v0.3.2 Pages storage is untouched.</footer>
   </main>;
