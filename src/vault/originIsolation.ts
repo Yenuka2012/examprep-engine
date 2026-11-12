@@ -73,9 +73,14 @@ function parseCandidate(
   // Trailing-dot hostname aliases and loopback are unsuitable for this
   // production topology preflight. This is not DNS/TLS verification.
   const hostname = url.hostname.toLowerCase();
+  // Loopback is the entire IPv4 127/8 range; a non-127.0.0.1
+  // alias must not masquerade as a valid destination HTTPS hostname.
+  const loopbackV4 = /^127(?:\\.\\d{1,3}){3}$/.test(hostname);
+  const mappedLoopbackV6 = hostname.startsWith('[::ffff:7f00:');
   if (!hostname || hostname.endsWith('.') ||
       hostname === 'localhost' || hostname.endsWith('.localhost') ||
-      hostname === '127.0.0.1' || hostname === '[::1]') {
+      hostname === '0.0.0.0' || hostname === '[::]' ||
+      loopbackV4 || mappedLoopbackV6 || hostname === '[::1]') {
     blockers.push(label === 'SOURCE' ? 'SOURCE_HOST_UNSAFE' : 'DESTINATION_HOST_UNSAFE');
   }
   return url;
