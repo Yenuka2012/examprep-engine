@@ -32,3 +32,12 @@ body{margin:0;background:#0c1524;color:#edf4ff;font:16px/1.5 system-ui,-apple-sy
 html.encrypted-owner-redacting #encrypted-owner{visibility:hidden!important}
 @media(max-width:540px){.encrypted-owner button{max-width:100%}.encrypted-owner nav button{flex:1 1 42%}}
 @media(prefers-reduced-motion:reduce){.encrypted-owner *{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
+
+.encrypted-owner .owner-insights-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:.65rem}
+.encrypted-owner .owner-insights-grid p{padding:.65rem;background:#22374e;border-radius:.5rem;margin:0}
+.encrypted-owner .owner-insights-grid strong{display:block;font-size:1.4rem;font-variant-numeric:tabular-nums}
+.encrypted-owner .owner-insights-table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.encrypted-owner .owner-insights-table th,.encrypted-owner .owner-insights-table td{
+ border-bottom:1px solid #4a6480;padding:.65rem;text-align:left;overflow-wrap:anywhere
+}
+.encrypted-owner .owner-insights-table th[scope=row]{font-weight:500}
