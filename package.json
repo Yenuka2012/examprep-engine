@@ -24,7 +24,8 @@
     "build:vault-test": "vite build --config vite.vault.config.ts",
     "preview:vault-test": "vite preview --config vite.vault.config.ts",
     "test:e2e:vault": "playwright test --config playwright.vault.config.ts",
-    "build:owner-staging": "vite build --config vite.owner-staging.config.ts"
+    "build:owner-staging": "vite build --config vite.owner-staging.config.ts",
+    "verify:owner-pwa": "node scripts/verify-owner-pwa-build.mjs"
   },
   "dependencies": {
     "ajv": "8.20.0",
