@@ -1,6 +1,7 @@
 import {defineConfig} from 'vite';
 import react from '@vitejs/plugin-react';
 import {VitePWA} from 'vite-plugin-pwa';
+import {evaluateOwnerStagingOrigin} from './src/vault/stagingOriginGuard';
 
 /**
  * Separate encrypted-owner HTTPS PWA staging ARTIFACT ONLY.
@@ -9,8 +10,12 @@ import {VitePWA} from 'vite-plugin-pwa';
 export default defineConfig(()=>{
   // This is a PUBLIC expected origin, not a secret. Actual hostname/TLS and
   // owner control still require independent verification before any staging.
-  if(!process.env.VITE_OWNER_STAGING_ORIGIN){
-    throw new Error('VITE_OWNER_STAGING_ORIGIN required for HTTPS staging build');
+  const expectedOrigin=process.env.VITE_OWNER_STAGING_ORIGIN??'';
+  const result=evaluateOwnerStagingOrigin(expectedOrigin,expectedOrigin);
+  if(!result.allowed){
+    // This build-time check reuses the exact runtime origin rule, never
+    // treats the hostname as proof of TLS, VPN or owner-controlled DNS.
+    throw new Error('Unsafe HTTPS staging origin: '+result.reason);
   }
   return {
     plugins:[
