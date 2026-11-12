@@ -51,6 +51,14 @@
 
 **Out of scope for this release:** features 8, 9, 11 and 13–16. Keep them deferred and do not merge the M2 experimental vault drafts into this UX release.
 
+## Exam UI v2 — professional certification question-format roadmap (design only, 2026-11-12)
+- Reviewed official certification formats and documented an extensible question taxonomy, responsive accessibility-first exam UI, and provider-specific delivery profiles.
+- Phase A: light/dark focus exam shell, mobile/tablet navigation and accessible controls; retain stable MCQ engine.
+- Phase B: versioned schema 2.0 for matching, ordering, classification, cloze, numeric, matrix and hotspot questions; preserve schema 1.0.
+- Phase C: multi-question cases, exhibits and structured simulation tasks. Phase D: optional private-host lab work and transparent simulated adaptive practice.
+- Keep source exam data, session persistence, historical scores, encrypted backups and vault cutover independently reviewed. **Design-only: no migration or deployment authorized.**
+- [Technical UI and question-format plan](docs/features/EXAM-UI-V2-QUESTION-TYPE-ROADMAP.md) · [issue #136](https://github.com/Yenuka2012/examprep-engine/issues/136).
+
 ## Release v0.4 — reliability and content quality
 - Optional IndexedDB encrypted-at-rest vault with reviewed key lifecycle.
 - Resilient long-lived backups/version migrations and recovery from browser storage eviction.
