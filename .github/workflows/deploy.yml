@@ -41,6 +41,18 @@ jobs:
         run: npm run build
       - name: Assert approved production source and built Pages exclude experimental vault
         run: node scripts/verify-production-isolation.mjs
+      - name: Verify encrypted runtime dependency graph excludes legacy source
+        run: node scripts/verify-vault-runtime-boundary.mjs
+      - name: Build HTTPS-only encrypted owner staging candidate (NEVER deployed)
+        env:
+          VITE_OWNER_STAGING_ORIGIN: https://exam.home.arpa
+        run: |
+          npm run build:owner-staging
+          test -s dist-owner-staging/owner-staging.html
+          test ! -e dist-owner-staging/index.html
+          test ! -e dist/owner-staging.html
+          test ! -e dist/offline-converter.html
+          test ! -e dist/encrypted-owner.html
       - name: Generate CycloneDX dependency inventory
         run: npm sbom --sbom-format cyclonedx > sbom.cdx.json
       - name: Hash production assets
