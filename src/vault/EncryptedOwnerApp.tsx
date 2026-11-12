@@ -195,8 +195,16 @@ export default function EncryptedOwnerApp({PwaStatus}:{
       binding.current=b;runtime.current=new EncryptedExamRuntime(b);
       await refresh();setPhase('unlocked');
       setMessage('Authenticated encrypted transfer restored to this empty vault. Independently verify all inventory and history.');
-    }catch(e){setError(fail(e));}
-    finally{
+    }catch(e){
+      const restored=binding.current;
+      if(restored)await restored.owner.lock().catch(()=>undefined);
+      // An already committed ciphertext header cannot be restored again
+      // into the same profile. Offer safe normal unlock instead of leaving
+      // the user trapped in the empty-vault enrollment screen.
+      const enrolled=await repository.enrolled().catch(()=>true);
+      setPhase(enrolled?'locked':'setup');
+      setError(fail(e)+' Any existing encrypted records were preserved.');
+    }finally{
       if(restoreRef.current)restoreRef.current.value='';
       if(masterRef.current)masterRef.current.value='';
       if(recoveryRef.current)recoveryRef.current.value='';
@@ -232,7 +240,11 @@ export default function EncryptedOwnerApp({PwaStatus}:{
       // leave the recovered vault intact for manual investigation.
       const active=binding.current;
       if(active)await active.owner.lock().catch(()=>undefined);
-      setError(fail(e));
+      // A failed post-commit inventory check retains ciphertext. Detect the
+      // durable header and present the recovery unlock, never re-enrollment.
+      const enrolled=await repository.enrolled().catch(()=>true);
+      setPhase(enrolled?'locked':'setup');
+      setError(fail(e)+' Any restored ciphertext was preserved. Do not reimport until independently verified.');
     }finally{
       if(restoreRef.current)restoreRef.current.value='';
       if(masterRef.current)masterRef.current.value='';
