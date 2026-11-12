@@ -75,7 +75,7 @@ function parseCandidate(
   const hostname = url.hostname.toLowerCase();
   // Loopback is the entire IPv4 127/8 range; a non-127.0.0.1
   // alias must not masquerade as a valid destination HTTPS hostname.
-  const loopbackV4 = /^127(?:\\.\\d{1,3}){3}$/.test(hostname);
+  const loopbackV4 = /^127(?:[.][0-9]{1,3}){3}$/.test(hostname);
   const mappedLoopbackV6 = hostname.startsWith('[::ffff:7f00:');
   if (!hostname || hostname.endsWith('.') ||
       hostname === 'localhost' || hostname.endsWith('.localhost') ||
