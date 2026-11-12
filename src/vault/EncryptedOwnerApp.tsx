@@ -11,7 +11,8 @@ import {
 } from './verifiedDestinationBridge';
 import {ExperimentalVaultRepository} from './storage';
 import {EncryptedExamRuntime,type ActiveExamRevision} from './encryptedExamRuntime';
-import {filterQuestionBanks,filterAttemptHistory,attemptReview,type ScoreBand} from '../learningInsights';
+import {filterQuestionBanks,filterAttemptHistory,attemptReview,weakestDomains,type ScoreBand} from '../learningInsights';
+import {selectSecurePracticeQuestions,domainMetricsFromAttempts,studySummary} from './studyParity';
 import {EXAM_PRESETS,examOverview,examTimeNotice,navigatorItems,submissionReview,type NavigatorFilter} from '../examUx';
 import {MAX_VAULT_TRANSFER_BYTES} from './transfer';
 import {restoreValidatedConvertedDestinationIntoEmpty} from './validatedConvertedRestore';
@@ -20,7 +21,7 @@ import type {QuestionBank,Attempt,ExamSession,CertificationProfile,SyllabusVersi
 import './encryptedOwner.css';
 
 type Phase='checking'|'setup'|'locked'|'unlocked';
-type View='banks'|'catalog'|'exam'|'history'|'backup';
+type View='banks'|'catalog'|'exam'|'history'|'insights'|'backup';
 type Category='bank'|'certification'|'syllabus';
 const MAX_IMPORT_BYTES=5*1024*1024;
 const copy=<T,>(item:T):T=>JSON.parse(JSON.stringify(item)) as T;
@@ -57,8 +58,16 @@ export default function EncryptedOwnerApp(){
   const [questionCount,setQuestionCount]=useState(20);
   const [filter,setFilter]=useState<NavigatorFilter>('all');
   const [query,setQuery]=useState('');
+  const [bankCertFilter,setBankCertFilter]=useState('ALL');
+  const [bankDomainFilter,setBankDomainFilter]=useState('ALL');
+  const [examDomain,setExamDomain]=useState('ALL');
+  const [certId,setCertId]=useState('');
+  const [certName,setCertName]=useState('');
+  const [certProvider,setCertProvider]=useState('');
   const [scoreFilter,setScoreFilter]=useState<ScoreBand>('all');
   const [historyCert,setHistoryCert]=useState('ALL');
+  const [historyFrom,setHistoryFrom]=useState('');
+  const [historyTo,setHistoryTo]=useState('');
   const [now,setNow]=useState(Date.now());
 
   function redact(){
@@ -68,6 +77,9 @@ export default function EncryptedOwnerApp(){
     revisionNumber.current++;
     setBanks([]);setAttempts([]);setCertifications([]);setSyllabi([]);
     setExam(null);setResult(null);setSelectedBank('');setFilter('all');setQuery('');
+    setBankCertFilter('ALL');setBankDomainFilter('ALL');setExamDomain('ALL');
+    setHistoryCert('ALL');setScoreFilter('all');setHistoryFrom('');setHistoryTo('');
+    setCertId('');setCertName('');setCertProvider('');
     setSaveState('saved');setView('banks');
     if(masterRef.current)masterRef.current.value='';
     if(recoveryRef.current)recoveryRef.current.value='';
@@ -299,6 +311,23 @@ export default function EncryptedOwnerApp(){
     });
     tail.current=op;
   }
+  async function addCertification(){
+    if(busy||phase!=='unlocked')return;
+    setBusy(true);setError('');setMessage('');
+    const g=generation.current;
+    try{
+      const candidate:CertificationProfile={
+        id:certId,name:certName,provider:certProvider,
+        createdAt:new Date().toISOString()
+      };
+      await ctx().addCertification(candidate);
+      if(g!==generation.current)return;
+      await refresh();
+      setCertId('');setCertName('');setCertProvider('');
+      setMessage('Certification profile saved only as encrypted vault content.');
+    }catch(e){if(g===generation.current)setError(fail(e));}
+    finally{if(g===generation.current)setBusy(false);}
+  }
   async function startExam(){
     if(busy||exam)return;
     const bank=banks.find(b=>b.bank_id===selectedBank)||banks[0];
@@ -312,7 +341,10 @@ export default function EncryptedOwnerApp(){
       const startedAt=new Date().toISOString();
       const session:ExamSession={
         id:crypto.randomUUID(),bank:copy(bank),
-        questions:copy(bank.questions.slice(0,Math.min(questionCount,bank.questions.length))),
+        questions:copy(selectSecurePracticeQuestions(
+          bank,examDomain,Math.min(questionCount,bank.questions.filter(
+            q=>examDomain==='ALL'||q.domain===examDomain).length)
+        )),
         answers:{},marked:[],index:0,startedAt,
         endsAt:Date.parse(startedAt)+minutes*60_000,durationSeconds:minutes*60
       };
@@ -351,10 +383,18 @@ export default function EncryptedOwnerApp(){
   }
 
   const selected=banks.find(b=>b.bank_id===selectedBank)??banks[0];
-  const filtered=filterQuestionBanks(banks,{query,certification:'ALL',domain:'ALL'},certifications);
+  const filtered=filterQuestionBanks(
+    banks,{query,certification:bankCertFilter,domain:bankDomainFilter},certifications);
   const history=filterAttemptHistory(attempts,{
-    certification:historyCert,score:scoreFilter,fromDate:'',toDate:''
+    certification:historyCert,score:scoreFilter,fromDate:historyFrom,toDate:historyTo
   });
+  const availableBankCerts=[...new Set(banks.map(b=>b.certification))].sort();
+  const availableBankDomains=[...new Set(banks.flatMap(b=>b.questions.map(q=>q.domain)))].sort();
+  const eligible=selected?.questions.filter(q=>examDomain==='ALL'||q.domain===examDomain)??[];
+  const practiceDomains=[...new Set(selected?.questions.map(q=>q.domain)??[])].sort();
+  const analytics=domainMetricsFromAttempts(attempts);
+  const priorities=weakestDomains(analytics);
+  const summary=studySummary(banks,attempts);
   const current=exam?.session.questions[exam.session.index];
   const counts=exam?examOverview(exam.session):null;
   return <main className="encrypted-owner" id="encrypted-owner-root">
@@ -391,9 +431,9 @@ export default function EncryptedOwnerApp(){
     </section>}
     {phase==='unlocked'&&<div className="owner-workspace">
       <nav aria-label="Owner workspace">
-        {(['banks','catalog','exam','history','backup'] as View[]).map(key=>
+        {(['banks','catalog','exam','history','insights','backup'] as View[]).map(key=>
           <button key={key} disabled={busy} aria-current={view===key?'page':undefined} onClick={()=>setView(key)}>
-            {key==='banks'?'Manage Content':key==='exam'?'Exam Practice':key==='history'?'Results':key==='catalog'?'Certifications':'Backup'}
+            {key==='banks'?'Manage Content':key==='exam'?'Exam Practice':key==='history'?'Results':key==='catalog'?'Certifications':key==='insights'?'Learning Insights':'Backup'}
           </button>)}
         <button onClick={()=>void lock()}>Lock vault</button>
       </nav>
