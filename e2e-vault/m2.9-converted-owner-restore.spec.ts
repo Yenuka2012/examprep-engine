@@ -115,7 +115,7 @@ test('converted restore rejects tampering and wrong independent credential witho
     bankRecord.ciphertext.slice(1);
   await supply(page,Buffer.from(JSON.stringify(payload)));
   await page.getByRole('button',{name:'Verify both credentials and restore converted transfer'}).click();
-  await expect(page.getByRole('alert')).toContainText(/verification failed|authenticated|invalid|corrupt/i);
+  await expect(page.getByRole('alert')).toContainText('Transfer record digest mismatch');
   await expect(page.getByRole('heading',{name:'Set up encrypted vault'})).toBeVisible();
   const names=await page.evaluate(async()=> (await indexedDB.databases()).map(x=>x.name));
   expect(names).not.toContain('examprep-v1');
