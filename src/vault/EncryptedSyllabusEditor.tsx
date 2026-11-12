@@ -19,10 +19,13 @@ type Props={
   certifications:readonly CertificationProfile[];
   banks:readonly QuestionBank[];
   onSaved:()=>Promise<void>;
+  onOwnerActivity:()=>void;
 };
 const errorText=(e:unknown)=>e instanceof Error?e.message:'Encrypted catalog operation failed';
 
-export default function EncryptedSyllabusEditor({runtime,certifications,banks,onSaved}:Props){
+export default function EncryptedSyllabusEditor({
+  runtime,certifications,banks,onSaved,onOwnerActivity
+}:Props){
   const [entries,setEntries]=useState<EncryptedSyllabusRevision[]>([]);
   const [cert,setCert]=useState('');
   const [version,setVersion]=useState('');
@@ -129,7 +132,10 @@ export default function EncryptedSyllabusEditor({runtime,certifications,banks,on
     }catch(e){setError(errorText(e)+' No draft or published record was overwritten.');}
     finally{setBusy(false);}
   }
-  return <section aria-label="Encrypted syllabus editor">
+  // Genuine keyboard and pointer events keep a long catalog-edit session
+  // active. Timers, asynchronous saves and hidden tabs never extend the lock.
+  return <section aria-label="Encrypted syllabus editor"
+    onInput={onOwnerActivity} onClick={onOwnerActivity}>
     <h3>Versioned syllabus management</h3>
     <p>Only authenticated drafts can be revised. Published versions are immutable;
       a conflicting revision or stale encrypted nonce is rejected.</p>
