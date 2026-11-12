@@ -442,16 +442,40 @@ export default function EncryptedOwnerApp(){
         <label>Import validated JSON bank (add-only) <input aria-label="Import question bank" type="file" accept=".json,application/json" disabled={busy}
           onChange={e=>{const file=e.currentTarget.files?.[0];e.currentTarget.value='';void importJson(file,'bank');}}/></label>
         <label>Find bank by title, certification, provider or domain
-          <input type="search" value={query} onChange={e=>setQuery(e.target.value)} /></label>
-        <p>{banks.length} encrypted bank(s) stored in this origin.</p>
+          <input aria-label="Search encrypted banks" type="search" value={query}
+            onChange={e=>setQuery(e.target.value)}/></label>
+        <label>Filter banks by certification <select aria-label="Filter banks by certification"
+          value={bankCertFilter} onChange={e=>setBankCertFilter(e.target.value)}>
+          <option value="ALL">All certifications</option>
+          {availableBankCerts.map(c=><option key={c} value={c}>{c}</option>)}
+        </select></label>
+        <label>Filter banks by domain <select aria-label="Filter banks by domain"
+          value={bankDomainFilter} onChange={e=>setBankDomainFilter(e.target.value)}>
+          <option value="ALL">All domains</option>
+          {availableBankDomains.map(d=><option key={d} value={d}>{d}</option>)}
+        </select></label>
+        <p>{banks.length} encrypted bank(s) stored in this origin; {filtered.length} match the filters.</p>
         <ul>{filtered.map(b=><li key={b.bank_id}>
           <strong>{b.title}</strong> — {b.certification} · {b.questions.length} questions
-          <button onClick={()=>{setSelectedBank(b.bank_id);setView('exam');}} disabled={busy}>Practice</button>
+          <button onClick={()=>{setSelectedBank(b.bank_id);setExamDomain('ALL');setView('exam');}}
+            disabled={busy}>Practice</button>
         </li>)}</ul>
       </section>}
       {view==='catalog'&&<section>
         <h2>Certification & syllabus catalog</h2>
         <p>Add-only validated import preserves published versions and historical exam snapshots.</p>
+        <form onSubmit={e=>{e.preventDefault();void addCertification();}}>
+          <h3>Create certification profile</h3>
+          <label>Certification ID <input aria-label="New certification ID" type="text"
+            required maxLength={64} pattern="[A-Za-z0-9][A-Za-z0-9._:-]*"
+            value={certId} onChange={e=>setCertId(e.target.value)}/></label>
+          <label>Certification name <input aria-label="New certification name" type="text"
+            required maxLength={120} value={certName} onChange={e=>setCertName(e.target.value)}/></label>
+          <label>Issuing organisation <input aria-label="New certification provider" type="text"
+            required maxLength={100} value={certProvider}
+            onChange={e=>setCertProvider(e.target.value)}/></label>
+          <button type="submit" disabled={busy}>Add encrypted certification</button>
+        </form>
         <label>Certification JSON <input type="file" accept=".json,application/json" disabled={busy}
           onChange={e=>{const file=e.currentTarget.files?.[0];e.currentTarget.value='';void importJson(file,'certification');}}/></label>
         <label>Syllabus JSON <input type="file" accept=".json,application/json" disabled={busy}
@@ -465,20 +489,28 @@ export default function EncryptedOwnerApp(){
         <h2>Exam Practice</h2>
         {!exam&&<div>
           <label>Select question bank <select aria-label="Practice bank" value={selected?.bank_id??''}
-            onChange={e=>setSelectedBank(e.target.value)}>
+            onChange={e=>{setSelectedBank(e.target.value);setExamDomain('ALL');}}>
               {banks.map(b=><option key={b.bank_id} value={b.bank_id}>{b.title}</option>)}
             </select></label>
+          <label>Practice domain <select aria-label="Practice domain"
+            value={examDomain} onChange={e=>setExamDomain(e.target.value)}>
+            <option value="ALL">All domains</option>
+            {practiceDomains.map(d=><option key={d} value={d}>{d}</option>)}
+          </select></label>
+          <p>{eligible.length} question(s) available in the selected domain.</p>
           <label>Preset <select aria-label="Exam preset" onChange={e=>{
-              const p=EXAM_PRESETS[Number(e.target.value)];if(p){setQuestionCount(Math.min(p.questions,selected?.questions.length??p.questions));setMinutes(p.minutes);}
+              const p=EXAM_PRESETS[Number(e.target.value)];if(p){setQuestionCount(Math.min(p.questions,eligible.length||p.questions));setMinutes(p.minutes);}
             }} defaultValue="">
             <option value="">Custom</option>{EXAM_PRESETS.map((p,i)=><option key={p.label} value={i}>{p.label}</option>)}
           </select></label>
-          <label>Questions <input type="number" min={1} max={selected?.questions.length??1}
-            value={Math.min(questionCount,selected?.questions.length??questionCount)}
+          <label>Questions <input aria-label="Practice question count" type="number"
+            min={1} max={eligible.length||1}
+            value={Math.min(questionCount,eligible.length||questionCount)}
             onChange={e=>setQuestionCount(Number(e.target.value))}/></label>
           <label>Duration (minutes) <input type="number" min={1} max={300} value={minutes}
             onChange={e=>setMinutes(Number(e.target.value))}/></label>
-          <button disabled={busy||!selected} onClick={()=>void startExam()}>Start encrypted exam</button>
+          <button disabled={busy||!selected||eligible.length===0}
+            onClick={()=>void startExam()}>Start encrypted exam</button>
         </div>}
         {exam&&current&&<div>
           <p role="status">Time remaining: {sec(remaining)} · Autosave: {saveState}</p>
@@ -536,6 +568,11 @@ export default function EncryptedOwnerApp(){
           <option value="all">All</option><option value="below60">Below 60%</option>
           <option value="between60and79">60–79%</option><option value="atleast80">80% or above</option>
         </select></label>
+        <label>Completed from (UTC) <input aria-label="Results from date"
+          type="date" value={historyFrom} onChange={e=>setHistoryFrom(e.target.value)}/></label>
+        <label>Completed to (UTC) <input aria-label="Results to date"
+          type="date" value={historyTo} onChange={e=>setHistoryTo(e.target.value)}/></label>
+        <p role="status">{history.length} of {attempts.length} attempts match the filters.</p>
         <ul>{history.map(a=><li key={a.id}>
           {a.bankTitle} · {a.correctCount}/{a.total} · {a.completedAt.slice(0,10)}
           <button onClick={()=>setResult(a)}>Review</button>
