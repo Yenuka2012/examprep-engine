@@ -2,7 +2,7 @@
  * M2.9 Phase 3C — native static-only offline service worker.
  * Compiled only for distinct-origin HTTPS staging; never for GitHub Pages.
  *
- * NO runtime caching, clients.claim(), skipWaiting(), messaging, background
+ * NO runtime caching, forced client takeover, forced worker activation, messaging, background
  * sync, IndexedDB, credentials, JSON backups, or decrypted exam records.
  *
  * The injected manifest is a build-time list of app shell assets. Every path
