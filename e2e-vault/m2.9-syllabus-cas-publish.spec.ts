@@ -95,17 +95,23 @@ test('catalog nonce CAS rejects stale changes, published edits and duplicate ver
   await page.evaluate(([m,r])=>window.m28.enroll(m,r),[MASTER,RECOVERY]);
   const original=await page.evaluate(()=>window.m28.createCatalogDraft());
   expect(original.syllabus).toMatchObject({revision:1,status:'draft'});
-  const revised=await page.evaluate(token=>window.m28.catalogRevise(token,'Revision Two'),original);
+  const firstToken={recordId:original.recordId,nonce:original.nonce,
+    revision:original.syllabus.revision};
+  const revised=await page.evaluate(token=>window.m28.catalogRevise(token,'Revision Two'),firstToken);
   expect(revised.syllabus).toMatchObject({revision:2,title:'Revision Two'});
-  await expect(page.evaluate(token=>window.m28.catalogRevise(token,'Stale overwrite'),original))
+  const secondToken={recordId:revised.recordId,nonce:revised.nonce,
+    revision:revised.syllabus.revision};
+  await expect(page.evaluate(token=>window.m28.catalogRevise(token,'Stale overwrite'),firstToken))
     .rejects.toThrow(/Stale syllabus draft token/);
-  await expect(page.evaluate(token=>window.m28.catalogPublish(token),original))
+  await expect(page.evaluate(token=>window.m28.catalogPublish(token),firstToken))
     .rejects.toThrow(/Stale syllabus publication token/);
-  const approved=await page.evaluate(token=>window.m28.catalogPublish(token),revised);
+  const approved=await page.evaluate(token=>window.m28.catalogPublish(token),secondToken);
   expect(approved.syllabus).toMatchObject({status:'published',revision:3});
-  await expect(page.evaluate(token=>window.m28.catalogPublish(token),approved))
+  const finalToken={recordId:approved.recordId,nonce:approved.nonce,
+    revision:approved.syllabus.revision};
+  await expect(page.evaluate(token=>window.m28.catalogPublish(token),finalToken))
     .rejects.toThrow(/Published syllabi are immutable/);
-  await expect(page.evaluate(token=>window.m28.catalogRevise(token,'Illegal published edit'),approved))
+  await expect(page.evaluate(token=>window.m28.catalogRevise(token,'Illegal published edit'),finalToken))
     .rejects.toThrow(/Published syllabi are immutable/);
   await page.evaluate(()=>window.m28.lock());
   await page.reload();
