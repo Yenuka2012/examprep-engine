@@ -24,7 +24,7 @@ function assertLoopback(){
   // An isolated localhost tool is not the Pages production origin.
   if(location.protocol!=='http:'||
       (location.hostname!=='127.0.0.1'&&location.hostname!=='localhost')||
-      !window.isSecureContext){
+      !window.isSecureContext||location.port!=='4174'){
     throw new Error('Only a secure loopback-only local preview can run this tool');
   }
 }
