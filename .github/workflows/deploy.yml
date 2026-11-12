@@ -49,8 +49,13 @@ jobs:
         run: |
           npm run build:owner-staging
           test -s dist-owner-staging/owner-staging.html
+          test -s dist-owner-staging/ownerStagingSw.js
+          test -s dist-owner-staging/manifest.webmanifest
+          node scripts/verify-owner-pwa-build.mjs
           test ! -e dist-owner-staging/index.html
           test ! -e dist/owner-staging.html
+          test ! -e dist/ownerStagingSw.js
+          test ! -e dist/manifest.webmanifest
           test ! -e dist/offline-converter.html
           test ! -e dist/encrypted-owner.html
       - name: Generate CycloneDX dependency inventory
