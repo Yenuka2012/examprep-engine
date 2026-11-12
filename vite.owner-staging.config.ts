@@ -1,24 +1,57 @@
 import {defineConfig} from 'vite';
 import react from '@vitejs/plugin-react';
+import {VitePWA} from 'vite-plugin-pwa';
 
 /**
- * Dedicated HTTPS staging ARTIFACT ONLY. Separate output directory, never
- * included in GitHub Pages dist/ deployment, with no service worker.
- * The preview requires a configured distinct HTTPS hostname.
+ * Separate encrypted-owner HTTPS PWA staging ARTIFACT ONLY.
+ * No production github.io deploy, no owner content in build or service worker.
  */
 export default defineConfig(()=>{
-  // Refuse accidental unconfigured builds. The runtime independently checks
-  // both the expected and actual HTTPS origin before mounting any vault UI.
+  // This is a PUBLIC expected origin, not a secret. Actual hostname/TLS and
+  // owner control still require independent verification before any staging.
   if(!process.env.VITE_OWNER_STAGING_ORIGIN){
-    throw new Error('VITE_OWNER_STAGING_ORIGIN is required for the isolated HTTPS staging build');
+    throw new Error('VITE_OWNER_STAGING_ORIGIN required for HTTPS staging build');
   }
   return {
-  plugins:[react()],
-  base:'/',
-  build:{
-    outDir:'dist-owner-staging',
-    sourcemap:false,
-    rollupOptions:{input:['owner-staging.html']}
-  }
+    plugins:[
+      react(),
+      VitePWA({
+        strategies:'injectManifest',
+        srcDir:'src/vault',
+        filename:'ownerStagingSw.js',
+        injectRegister:false,
+        registerType:'prompt',
+        includeAssets:['favicon.svg'],
+        manifest:{
+          id:'/owner-staging.html',
+          name:'ExamPrep Engine — Encrypted Owner Staging',
+          short_name:'ExamPrep Owner',
+          description:'Owner-only encrypted offline examination practice (staging)',
+          start_url:'/owner-staging.html',
+          scope:'/',
+          display:'standalone',
+          background_color:'#0c1524',
+          theme_color:'#18283d',
+          icons:[{src:'/favicon.svg',sizes:'any',type:'image/svg+xml',purpose:'any'}]
+        },
+        injectManifest:{
+          // Do not scan everything! Only compiled static shell resources are
+          // permitted in CacheStorage, never imports or user-owned data.
+          globPatterns:[
+            'owner-staging.html',
+            'assets/**/*.{js,css,svg}',
+            'favicon.svg',
+            'manifest.webmanifest'
+          ],
+          maximumFileSizeToCacheInBytes:5*1024*1024
+        }
+      })
+    ],
+    base:'/',
+    build:{
+      outDir:'dist-owner-staging',
+      sourcemap:false,
+      rollupOptions:{input:['owner-staging.html']}
+    }
   };
 });
