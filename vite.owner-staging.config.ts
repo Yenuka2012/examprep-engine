@@ -43,8 +43,8 @@ export default defineConfig(()=>{
           globPatterns:[
             'owner-staging.html',
             'assets/**/*.{js,css,svg}',
-            'favicon.svg',
-            'manifest.webmanifest'
+            'favicon.svg'
+            // VitePWA itself appends manifest.webmanifest exactly once.
           ],
           maximumFileSizeToCacheInBytes:5*1024*1024
         }
