@@ -84,7 +84,7 @@ test('real AES-GCM logical-v2 → verified vault transfer → empty encrypted re
   await supply(page,wire);
   await page.getByRole('button',{name:'Verify both credentials and restore converted transfer'}).click();
   await expect(page.getByRole('status').filter({hasText:'Vault: unlocked'})).toBeVisible();
-  await expect(page.getByText('1 encrypted bank(s) stored in this origin.')).toBeVisible();
+  await expect(page.getByText('1 encrypted bank(s) stored in this origin; 1 match the filters.')).toBeVisible();
   await expect(page.getByText('Converted Phase 2 Bank')).toBeVisible();
   await page.getByRole('button',{name:'Certifications'}).click();
   await expect(page.getByText('Converted Synthetic Certification')).toBeVisible();
