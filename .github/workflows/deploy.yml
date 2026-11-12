@@ -52,6 +52,14 @@ jobs:
           test -s dist-owner-staging/ownerStagingSw.js
           test -s dist-owner-staging/manifest.webmanifest
           node scripts/verify-owner-pwa-build.mjs
+          # Negative build checks: the runtime must never be the first line
+          # of defense against deploying to the old Pages origin or HTTP.
+          for unsafe in "https://yenuka2012.github.io" "http://exam.home.arpa" "https://exam.home.arpa/path"; do
+            if VITE_OWNER_STAGING_ORIGIN="$unsafe" npm run build:owner-staging > /tmp/unsafe-origin-check.log 2>&1; then
+              echo "Unsafe origin was unexpectedly accepted by staging build" >&2
+              exit 1
+            fi
+          done
           test ! -e dist-owner-staging/index.html
           test ! -e dist/owner-staging.html
           test ! -e dist/ownerStagingSw.js
