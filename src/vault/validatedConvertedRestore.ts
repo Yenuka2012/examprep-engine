@@ -1,7 +1,7 @@
 /**
  * M2.9 Phase 2 — authenticated logical-v2 → ciphertext-only destination restore.
  * The transfer is created in the separate loopback-only offline converter.
- * This bridge must NEVER open examprep-v1, read source browser data, or fall
+ * This bridge must NEVER open the original browser database, read source data, or fall
  * back to plaintext. A validation failure retains any already-written vault.
  */
 import {
