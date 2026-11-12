@@ -624,9 +624,11 @@ export default function EncryptedOwnerApp(){
         <p>Export only ciphertext. No exam content is transmitted to GitHub or another server by this interface.</p>
         <button disabled={busy||saveState!=='saved'} onClick={()=>void exportEncrypted()}>Download encrypted vault backup</button>
         <p>Before using this for real data, separately verify master-password and recovery-password restoration in independent empty profiles. The existing source browser must be preserved.</p>
+        {window.location.protocol==='http:'&&window.location.port==='4174'&&
+        ['127.0.0.1','localhost'].includes(window.location.hostname)&&
         <p>Test-only offline converter (loopback only):
           <a href="/offline-converter.html">Open isolated converter preview</a>.
-          Never use real owner backups with this experimental build.</p>
+          Never use real owner backups with this experimental build.</p>}
         <OriginTopologyPanel/>
       </section>}
     </div>}
