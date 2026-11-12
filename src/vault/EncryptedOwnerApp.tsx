@@ -495,7 +495,7 @@ export default function EncryptedOwnerApp(){
         <ul>{syllabi.map(s=><li key={s.id}>{s.title} — {s.version} ({s.status})</li>)}</ul>
         {runtime.current&&<EncryptedSyllabusEditor runtime={runtime.current}
           certifications={certifications} banks={banks} onSaved={refresh}/>}
-      </section>
+      </section>}
       {view==='exam'&&<section>
         <h2>Exam Practice</h2>
         {!exam&&<div>
