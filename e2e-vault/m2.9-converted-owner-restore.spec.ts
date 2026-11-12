@@ -87,8 +87,12 @@ test('real AES-GCM logical-v2 → verified vault transfer → empty encrypted re
   await expect(page.getByText('1 encrypted bank(s) stored in this origin; 1 match the filters.')).toBeVisible();
   await expect(page.getByText('Converted Phase 2 Bank')).toBeVisible();
   await page.getByRole('button',{name:'Certifications'}).click();
-  await expect(page.getByText('Converted Synthetic Certification')).toBeVisible();
-  await expect(page.getByText('Converted Synthetic Syllabus')).toBeVisible();
+  await expect(page.getByRole('listitem').filter({
+    hasText:'TEST ONLY — Converted Synthetic Certification'
+  })).toBeVisible();
+  await expect(page.getByRole('listitem').filter({
+    hasText:'Converted Synthetic Syllabus'
+  }).first()).toBeVisible();
   await page.getByRole('button',{name:'Results'}).click();
   await expect(page.getByText('Converted Phase 2 Bank · 1/1')).toBeVisible();
   await page.getByRole('button',{name:'Review',exact:true}).click();
