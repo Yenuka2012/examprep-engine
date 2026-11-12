@@ -238,6 +238,40 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+  # M2.9 P3C: exercise the compiled staging SW on synthetic loopback.
+  # The encrypted owner UI MUST refuse the loopback origin, while the worker
+  # static shell itself is checked for real offline reopen and cache scope.
+  owner-pwa-browser-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f
+      options: --user 1001
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install dependencies and generate validation source
+        run: |
+          npm ci --no-fund
+          npm run generate:validator
+      - name: Validate static-only PWA compiled in isolated browser targets
+        run: npm run test:e2e:owner-pwa
+      - name: Retain owner PWA browser failure traces
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: owner-pwa-browser-failure
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
+          retention-days: 14
+
   codeql-gate:
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -264,7 +298,7 @@ jobs:
 
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    needs: [verify, browser-tests, source-barrier-browser-tests, mixed-version-browser-tests, vault-bridge-browser-tests, codeql-gate]
+    needs: [verify, browser-tests, source-barrier-browser-tests, mixed-version-browser-tests, vault-bridge-browser-tests, owner-pwa-browser-tests, codeql-gate]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment:
