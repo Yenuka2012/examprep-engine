@@ -29,7 +29,10 @@ function verifiedEntries(){
          url.pathname==='/favicon.svg'||
          allowedAsset.test(url.pathname))||
        seen.has(url.pathname)){
-      throw new Error('Unapproved owner-staging precache asset');
+      // Manifest paths are generated from compiled static files. Reveal only
+      // the sanitized pathname and rule, never query parameters or secrets.
+      throw new Error('Unapproved owner-staging precache asset ('+
+        (seen.has(url.pathname)?'duplicate':'path')+'): '+url.pathname);
     }
     seen.add(url.pathname);
     return {url:url.href,revision:item.revision};
