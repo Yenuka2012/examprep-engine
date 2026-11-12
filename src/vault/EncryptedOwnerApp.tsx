@@ -357,6 +357,14 @@ export default function EncryptedOwnerApp(){
   }
   function editSession(change:(s:ExamSession)=>ExamSession){
     if(!draft.current||busy)return;
+    const owner=binding.current?.owner;
+    if(!owner?.active){
+      setError('Encrypted owner session is locked; unlock before editing answers.');
+      return;
+    }
+    // Genuine owner clicks (answers/navigation/flags/retry) refresh activity.
+    // Autosave and timer callbacks never artificially extend the idle timeout.
+    try{owner.touch();}catch(e){setError(fail(e));return;}
     queueSnapshot(change(copy(draft.current.session)));
   }
   async function submit(expired=false){
