@@ -41,3 +41,10 @@ html.encrypted-owner-redacting #encrypted-owner{visibility:hidden!important}
  border-bottom:1px solid #4a6480;padding:.65rem;text-align:left;overflow-wrap:anywhere
 }
 .encrypted-owner .owner-insights-table th[scope=row]{font-weight:500}
+
+.encrypted-owner .owner-syllabus-domain{margin:.85rem 0;border:1px solid #59728f;border-radius:.65rem;padding:.85rem}
+.encrypted-owner .owner-syllabus-domain textarea{display:block;width:100%;min-height:94px;max-width:100%;
+  resize:vertical;border:1px solid #7f9abc;background:#eaf2ff;color:#101a2a;border-radius:.45rem;padding:.65rem;font:inherit}
+.encrypted-owner .owner-syllabus-domain textarea:focus-visible{outline:3px solid #94f2df;outline-offset:2px}
+.encrypted-owner .owner-syllabus-domain label{max-width:680px}
+.encrypted-owner .owner-syllabus-domain legend{font-weight:650}
