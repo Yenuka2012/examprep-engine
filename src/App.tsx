@@ -57,6 +57,7 @@ export default function App() {
   const [examTheme,setExamTheme]=useState<'light'|'dark'>('light');
   const [examFocus,setExamFocus]=useState(false);
   const [navigatorOpen,setNavigatorOpen]=useState(false);
+  const questionHeadingRef=useRef<HTMLHeadingElement|null>(null);
   const [domain,setDomain]=useState('ALL');
   const [error,setError]=useState('');
   const [notice,setNotice]=useState('');
@@ -396,6 +397,31 @@ export default function App() {
   const weakDomainPriorities=useMemo(()=>weakestDomains(domainStats),[domainStats]);
   const resultBreakdown=useMemo(()=>viewResult?attemptReview(viewResult):null,[viewResult]);
   const isActiveExam=page==='exam'&&!!session&&examAccess==='owner'&&!storageUpdateMessage;
+  // Announce newly opened questions without stealing focus when answers change.
+  useEffect(()=>{
+    if(isActiveExam)questionHeadingRef.current?.focus();
+  },[isActiveExam,session?.index]);
+  // The narrow-screen navigator behaves as a keyboard-accessible drawer.
+  useEffect(()=>{
+    if(!navigatorOpen)return;
+    const drawer=document.getElementById('exam-question-navigator');
+    const opener=document.querySelector<HTMLButtonElement>('.exam-nav-toggle');
+    const close=drawer?.querySelector<HTMLButtonElement>('.exam-nav-close');
+    close?.focus();
+    const onKey=(event:KeyboardEvent)=>{
+      if(event.key==='Escape'){
+        event.preventDefault();setNavigatorOpen(false);opener?.focus();return;
+      }
+      if(event.key!=='Tab'||!drawer)return;
+      const controls=Array.from(drawer.querySelectorAll<HTMLElement>('button:not([disabled]),select:not([disabled])'));
+      if(!controls.length)return;
+      const first=controls[0],last=controls[controls.length-1];
+      if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
+      else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+    };
+    document.addEventListener('keydown',onKey);
+    return()=>document.removeEventListener('keydown',onKey);
+  },[navigatorOpen]);
   return <div className={'app'+(isActiveExam?' exam-active':'')+(isActiveExam&&examFocus?' exam-focus':'')}>
     <aside className="sidebar">
       <div className="brand"><BookOpen size={26}/><div><strong>ExamPrep</strong><span>PERSONAL ENGINE</span></div></div>
@@ -580,7 +606,7 @@ export default function App() {
                 <button type="button" className="subtle" onClick={flag} aria-pressed={marked}>
                   <Flag size={16} aria-hidden="true"/> {marked?'Unflag':'Flag'}</button>
               </div>
-              <h2 id="exam-question-heading">{q.question}</h2>
+              <h2 id="exam-question-heading" tabIndex={-1} ref={questionHeadingRef}>{q.question}</h2>
               <fieldset className="choice-fieldset">
                 <legend className="sr-only">Answer choices for question {session.index+1}</legend>
                 <div className="choices">{q.options.map(o=><label className={'choice '+(picked.includes(o.id)?'selected':'')} key={o.id}>
@@ -591,6 +617,7 @@ export default function App() {
               </fieldset>
             </section>
             <aside id="exam-question-navigator" className={'panel exam-navigator'+(navigatorOpen?' drawer-open':'')}
+              role={navigatorOpen?'dialog':undefined} aria-modal={navigatorOpen?true:undefined}
               aria-label="Question navigator">
               <div className="sectionhead"><h3>Question navigator</h3>
                 <button type="button" className="subtle exam-nav-close" onClick={()=>setNavigatorOpen(false)}>
