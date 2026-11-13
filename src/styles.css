@@ -177,7 +177,8 @@
     box-shadow:-12px 0 60px #0005;padding:20px;padding-bottom:max(20px,env(safe-area-inset-bottom))}
   .exam-stage .exam-navigator .exam-nav-close{display:inline-flex}
   .exam-stage .exam-nav-toggle{display:inline-flex}
-  .exam-actions .exam-submit-small{display:inline-flex}
+  .exam-actions{flex-wrap:wrap}
+  .exam-stage .exam-actions .exam-submit-small{display:inline-flex;width:auto;min-width:120px}
 }
 @media(max-width:700px){
   .exam-active .main{padding:12px}
@@ -200,3 +201,7 @@
 @media(prefers-reduced-motion:reduce){
   .exam-stage *, .exam-stage *::before, .exam-stage *::after{scroll-behavior:auto!important;transition:none!important}
 }
+
+/* Keep the surrounding workspace consistent with the optional dark exam palette. */
+.app.exam-active:has(.exam-stage.theme-dark){background:#0b1020}
+.app.exam-active:has(.exam-stage.theme-dark) .top h1{color:#f0f5ff}
