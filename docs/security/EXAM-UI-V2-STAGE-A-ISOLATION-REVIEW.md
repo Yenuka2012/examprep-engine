@@ -19,7 +19,7 @@ The initial #142 CI run reached the production-isolation step after successful d
 - This PR does **not** implement a new Study Mode, complex item types, adaptive scoring, browser proctoring or encryption cutover.
 
 ## 3. Exact candidate pins
-- `src/App.tsx` Git blob SHA: `d28afe582882a98366c19476075943c579978f45`
+- `src/App.tsx` Git blob SHA: `81705d5b10a891b35d3817ef79c2d07192a2bd48`
 - `src/styles.css` Git blob SHA: `6607c31dc52a296c76e6159f6394d30727a09db1`
 
 No change to the meaning of the gate: all other ordinary source hashes remain frozen; new ordinary `src/` and `public/` files remain rejected; build output is still scanned for synthetic vault markers and the test harness. These pins must be updated again by explicit review if either file changes.
