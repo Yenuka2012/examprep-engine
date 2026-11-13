@@ -3,6 +3,9 @@
  * TypeScript 7 intentionally has no stable compiler API. Instead, pin EVERY
  * ordinary production source/build entry to its reviewed v0.3.2 release-candidate blob.
  * Only the separately built synthetic vault and cutover modules may differ.
+ * Stage A PR #142 updates the reviewed App/styles pins only; this is a
+ * release-candidate security baseline update, NOT production authorization.
+ * See docs/security/EXAM-UI-V2-STAGE-A-ISOLATION-REVIEW.md.
  * Build output is independently scanned for the vault test database/fixtures.
  * This is a release-specific change freeze, not a general TS import parser.
  */
@@ -15,7 +18,7 @@ const frozen={
   "index.html": "8c89659de53b7857228fecbd0c663a3fc870c696",
   "public/favicon.svg": "778ad69298b6b89045dc8b0a924f85c27bf1c48d",
   "scripts/generate-validator.mjs": "afac5049c68a8a28f07679bc1e9f1a4655da6633",
-  "src/App.tsx": "87ddaceb28e1594b7ced04869209702f955ae832",
+  "src/App.tsx": "d28afe582882a98366c19476075943c579978f45",
   "src/CatalogPanel.tsx": "78a207001d19908c32df5aecb32400707cd190c3",
   "src/CutoverReadinessPanel.tsx": "78a4666a45371a0c5af5ff6ebc44909d1ad69c9b",
   "src/PwaStatus.tsx": "dcb531a4b3e2965b46a019628c4b187f7d92f5e0",
@@ -57,7 +60,7 @@ const frozen={
   "src/schema.json": "03a6c56173914e4ab4d8d8cd22dfee7d9a3f1848",
   "src/storageVersionGuard.test.ts": "b4e1ab48d99812504ee92ac91912d95f4335bd12",
   "src/storageVersionGuard.ts": "523a8f222fb2ec2429d65a3ffee6e6460bf2e215",
-  "src/styles.css": "f9329a2d1f9ce8f67ffb040bc1a6b0c68a0c080a",
+  "src/styles.css": "5bf78ec3b1688a6716277abdc4a2545187656ef7",
   "src/types.ts": "0795739bbac673100aaea97a98ad528623f77f79",
   "src/vite-env.d.ts": "64251fba07826fb9f05570afb6d4b7d2b0cea3a2",
   "vite.config.ts": "78a2af5c70ca0c799de690a7bdfef8d5593cce71"
