@@ -18,7 +18,7 @@ const frozen={
   "index.html": "8c89659de53b7857228fecbd0c663a3fc870c696",
   "public/favicon.svg": "778ad69298b6b89045dc8b0a924f85c27bf1c48d",
   "scripts/generate-validator.mjs": "afac5049c68a8a28f07679bc1e9f1a4655da6633",
-  "src/App.tsx": "d28afe582882a98366c19476075943c579978f45",
+  "src/App.tsx": "81705d5b10a891b35d3817ef79c2d07192a2bd48",
   "src/CatalogPanel.tsx": "78a207001d19908c32df5aecb32400707cd190c3",
   "src/CutoverReadinessPanel.tsx": "78a4666a45371a0c5af5ff6ebc44909d1ad69c9b",
   "src/PwaStatus.tsx": "dcb531a4b3e2965b46a019628c4b187f7d92f5e0",
