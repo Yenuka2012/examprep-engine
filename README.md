@@ -2,24 +2,33 @@
 
 A free, browser-based, local-first exam preparation application for multiple certifications.
 
-## Available capabilities (v0.2.1 deployed; M1.1 catalog in development)
+## Available capabilities (v0.3.2 release candidate; owner physical-device acceptance pending)
 - JSON question-bank import with strict schema validation (single- and multiple-choice)
 - Timed examinations, question navigation, flags, scoring and answer review
-- Persistent local question banks, history, and unfinished exams using IndexedDB
+- Persistent local question banks, history, unfinished exams, certification profiles and versioned syllabus catalogs using IndexedDB (Dexie schema v3)
 - Origin-wide Web Locks single-writer exam protection, serialized autosave, explicit save status, and final durable save before submission
 - Domain-level learning analytics
-- **Encrypted-only exports:** whole-profile backups and individual question banks are AES-256-GCM password-protected JSON envelopes; legacy plaintext restore warns and does not overwrite existing data
+- **Encrypted-only exports:** whole-profile backups and individual question banks are AES-256-GCM password-protected JSON envelopes; legacy plaintext-v1 restore warns and merge-only recovery does not overwrite conflicting records
 - Scoped offline-capable PWA (after first online load)
 - CI typechecking, unit/security tests, reproducible npm ci, dependency audit, Chromium/WebKit Playwright, CodeQL, SBOM and asset hashes
 - GitHub Pages deployment requires passing verify, browser and CodeQL gates on the same workflow run
 
+## v0.3.2 planned release: minimal-impact examination UX and learning insights
+
+Candidate includes the nine owner-approved enhancements (original #1–7, #10, #12): cancelable pre-submission counts; question navigator filters; five-minute/one-minute timer notices; bank search by title, certification, provider when catalog metadata matches, and domain; completed-attempt history filters; sample-size-aware weak-domain indicators; read-only backup/recovery guidance; editable exam presets; and immutable-snapshot-based result breakdowns. Changes are confined to React UI, derived read-only metrics, and a read-only catalog lookup. No new packages, Dexie schema changes, autosave or Web Lock changes, backup format changes, or experimental vault activation.
+
+**Review status:** Release candidate only; not merged or deployed. Production remains v0.3.1 until protected release approval and the actual `main` deployment job succeeds. See [v0.3.2 release checklist](docs/releases/V0.3.2-RELEASE-READINESS.md), [acceptance details](docs/features/V0.3.2-MINIMAL-IMPACT-ACCEPTANCE.md) and [tracking issue #113](https://github.com/Yenuka2012/examprep-engine/issues/113). This candidate does not authorize migration or deletion of owner data.
+
+## v0.3.1 non-destructive security foundations release
+The isolated S1–S5 vault cryptography, authenticated transfer, synthetic migration journal and fail-closed readiness source are included for automated testing only. The **production application entry and UI are unchanged**; the synthetic vault harness is not served on GitHub Pages. The active examprep-v1 database is still plaintext at rest and is neither migrated nor deleted. See [release decision](docs/releases/V0.3.1-SECURITY-FOUNDATIONS-RELEASE.md). The encrypted vault is NOT activated and issue #100 remains a blocker for real cutover.
+
 ## Security boundaries
-The application source is public. Uploaded questions and answers stay in local browser storage, **not encrypted at rest**; local browser/extension compromise and storage eviction remain risks. Encrypted backups require a strong unique passphrase. Unfinished exam sessions are not included in backup v1. This is not an officially endorsed or proctored exam system.
+The application source is public. Uploaded questions and answers stay in local browser storage, **not encrypted at rest**; local browser/extension compromise and storage eviction remain risks. Encrypted backups require a strong unique passphrase. Unfinished exam sessions are **not included in the current logical-v2 backup**. Finish an exam before relying on a full export. This is not an officially endorsed or proctored exam system.
 
 ## Deployment
-1. For the currently deployed M0.1, [PR #74](https://github.com/Yenuka2012/examprep-engine/pull/74) passed its checks and was merged. For **M1.1**, review [PR #77](https://github.com/Yenuka2012/examprep-engine/pull/77) and verify every required check on the final head commit, following the solo-maintainer protected-PR policy.
-2. Configure and enforce main branch protection and required checks following the [M0.1 runbook](docs/releases/M0.1-RELEASE-GATES.md).
-3. Merge only after owner security acceptance. The deployment workflow publishes `main` if all its own checks pass.
+1. [M1.1 PR #77](https://github.com/Yenuka2012/examprep-engine/pull/77) was merged into protected `main` in v0.3.0. The [v0.3.0 production workflow](https://github.com/Yenuka2012/examprep-engine/actions/runs/42223723849) deployed successfully. **Physical iPhone/iPad Safari/PWA and clean-profile logical-v2 backup acceptance are still tracked in [#83](https://github.com/Yenuka2012/examprep-engine/issues/83).**
+2. Keep branch protection and all required checks configured using the [release-gate runbook](docs/releases/M0.1-RELEASE-GATES.md).
+3. Merges must pass security reviews and the same-commit verify, browser E2E and CodeQL checks. The workflow publishes `main` after its checks pass.
 4. Ensure **Settings → Pages → Source → GitHub Actions** is selected.
 5. Open https://Yenuka2012.github.io/examprep-engine/ after a successful Pages deployment and perform the runbook's browser/iOS acceptance tests.
 6. Download the [synthetic sample bank](samples/demo-bank.json) and import it through **Question Banks**.
@@ -38,8 +47,12 @@ npm run test:e2e
 ## Data format
 `samples/demo-bank.json` is the canonical import example. The schema permits 1–10,000 questions per bank, up to 8 answer options per question. Uploaded JSON must use `schema_version: "1.0"`.
 
-## M1.1 development branch
-Certification profile and syllabus catalog functionality is being developed in a feature branch. It will create an additive IndexedDB v3 schema and **logical backup v2 with mandatory catalog arrays**, wrapped in the unchanged encrypted backup envelope. The current M0.1 reader rejects logical backup v2 rather than silently discarding metadata. **A v3 browser database cannot be safely downgraded by redeploying the old v2 application.** [Review the design](docs/architecture/M1.1-CATALOG-DESIGN.md). Do not confuse this feature branch with the deployed v0.2.1 release.
+## M1.1 production status and compatibility
+The certification/syllabus catalog was merged in v0.3.0. The additive Dexie v3 schema stores certification profiles and immutable published syllabus versions without rewriting historical attempts. Full-profile encrypted exports use **logical backup version 2** with mandatory `certifications` and `syllabi` arrays inside the unchanged `examprep-encrypted-backup-v1` AES-256-GCM envelope. The application accepts legacy logical-v1 backups after strict validation; plaintext logical-v2 files are rejected.
+
+**Do not roll back to v0.2.1 on an upgraded profile.** Dexie v3 maps to native IndexedDB version 30; the older v2 application expects 20 and cannot open an upgraded database. Preserve the browser profile, use compatible v3 recovery builds, and verify encrypted backup restore in a fresh profile before any future migration. See [architecture](docs/architecture/M1.1-CATALOG-DESIGN.md) and [release acceptance](docs/releases/M1.1-PRODUCTION-ACCEPTANCE.md).
+
+The staged M2 vault source is **test-only security foundations, not deployed production encryption**. Further migration and hosting prototypes require separate review. They will retain one free/open-source static PWA codebase for public GitHub Pages and a private Ubuntu VM, and provide single-owner Manage Content and Exam Practice modes. GitHub Pages **cannot provide server-side login**; its browser-vault unlock is local cryptographic access control, not remote authentication. iPad support is in scope, with physical iPadOS acceptance pending.
 
 ## Operations
 - Question banks, exam answers and history are specific to each browser profile.

@@ -15,10 +15,10 @@
 
 ## Release v0.3 — M1 learning intelligence
 
-### M1.1 — Certification catalog (in development)
+### M1.1 — Certification catalog (deployed in v0.3.0)
 - Additive IndexedDB v3 profiles with immutable published syllabus versions, weights and objectives.
 - Logical backup v2 (with a backwards-compatible decrypting reader for v1), draft revision protection, UI and browser tests. An older v0.2.1 reader intentionally rejects new logical v2 backups, preventing catalog data loss.
-- [Technical design](architecture/M1.1-CATALOG-DESIGN.md); UX-001 #58. This is not yet a production release.
+- [Technical design](architecture/M1.1-CATALOG-DESIGN.md); UX-001 #58. Deployed in v0.3.0; related physical iOS and backup acceptance is tracked under #83/#78.
 
 ### M1.2+ — Question-bank and adaptive intelligence
 - Certification profiles, syllabus versioning, domain weighting and learning objectives.
@@ -27,6 +27,29 @@
 - Deterministic adaptive selection with fairness/unseen-question quotas.
 - Spaced repetition (FSRS or equivalent) with inspectable scheduling inputs.
 - Study planner and daily goals, exportable history.
+
+## Approved release v0.3.2 — Minimal-impact examination UX and learning insights (release candidate)
+
+**Decision confirmed 8 November 2026:** include recommendations **1–7, 10 and 12** (nine enhancements). Canonical scope and acceptance: [#113](https://github.com/Yenuka2012/examprep-engine/issues/113). Implemented in draft PRs #115 and #116, consolidated in the v0.3.2 release candidate. No production merge or deployment authorization is implied.
+
+**v0.3.2-A — Exam interaction (original features 1, 2, 3, 10)**
+- Pre-submission summary of answered, unanswered and flagged questions before explicit confirmation.
+- Navigator filters for all, answered, unanswered and flagged items, without changing saved answers.
+- Non-blocking, accessible 5-minute/1-minute examination timer alerts, without changing expiry/submission logic.
+- Optional quick exam presets (question count/duration) using existing validated configuration.
+
+**v0.3.2-B — Discovery and learning insights (original features 4, 5, 6, 12)**
+- Client-side question-bank search/filter by certification/provider, title and domain.
+- Historical attempt filters by certification, score and completion date.
+- Weak-domain identification from existing completed-attempt data, with sample sizes and insufficient-data handling.
+- Improved results breakdown: correct, incorrect, unanswered, domain insights and targeted revision suggestions, without changing scoring.
+
+**v0.3.2-C — Recovery safety guidance (original feature 7)**
+- Read-only backup/recovery checklist clarifying that unfinished exams are excluded from encrypted logical-v2 exports. Do not invoke backup/restore automatically.
+
+**Architectural guardrails:** React UI and derived-data logic only where feasible; no production IndexedDB schema, exam autosave/locking, grading, encrypted backup format, PWA/service-worker or vault-cryptography changes; no paid components. Retain both Pages and private Ubuntu VM hosting, single owner and responsive iPhone/iPad design. Full strict TS, Vitest, all Playwright/security suites, CodeQL and Pages isolation checks before any eventual deployment. Issues #78/#83 and #100 remain independent security/recovery blockers.
+
+**Out of scope for this release:** features 8, 9, 11 and 13–16. Keep them deferred and do not merge the M2 experimental vault drafts into this UX release.
 
 ## Release v0.4 — reliability and content quality
 - Optional IndexedDB encrypted-at-rest vault with reviewed key lifecycle.
