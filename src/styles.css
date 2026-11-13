@@ -102,7 +102,7 @@
 .exam-utility:hover,.exam-utility[aria-pressed=true]{background:var(--ex-hover);border-color:var(--ex-blue)}
 .exam-stage button:focus-visible,.exam-stage select:focus-visible,.exam-stage input:focus-visible{
   outline:3px solid var(--ex-blue);outline-offset:3px}
-.exam-nav-toggle,.exam-nav-close{display:none}
+.exam-nav-toggle,.exam-nav-close,.exam-nav-backdrop{display:none}
 .exam-overview{display:grid;gap:11px;background:var(--ex-panel);border:1px solid var(--ex-line);
   border-radius:12px;padding:16px 18px}
 .exam-progress-heading{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
@@ -170,6 +170,8 @@
 @media(max-width:1100px){
   .exam-shell{grid-template-columns:minmax(0,1fr)}
   .exam-stage .exam-navigator{display:none}
+  .exam-stage .exam-nav-backdrop{display:block;position:fixed;inset:0;z-index:25;
+    background:#061224a0;border:0;border-radius:0}
   .exam-stage .exam-navigator.drawer-open{display:block;position:fixed;top:0;right:0;bottom:0;
     width:min(400px,100vw);overflow-y:auto;z-index:30;border-radius:0;
     box-shadow:-12px 0 60px #0005;padding:20px;padding-bottom:max(20px,env(safe-area-inset-bottom))}
