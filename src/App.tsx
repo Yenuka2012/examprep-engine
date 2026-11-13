@@ -396,7 +396,7 @@ export default function App() {
   const weakDomainPriorities=useMemo(()=>weakestDomains(domainStats),[domainStats]);
   const resultBreakdown=useMemo(()=>viewResult?attemptReview(viewResult):null,[viewResult]);
   const isActiveExam=page==='exam'&&!!session&&examAccess==='owner'&&!storageUpdateMessage;
-  return <div className={'app'+(isActiveExam&&examFocus?' exam-focus':'')}>
+  return <div className={'app'+(isActiveExam?' exam-active':'')+(isActiveExam&&examFocus?' exam-focus':'')}>
     <aside className="sidebar">
       <div className="brand"><BookOpen size={26}/><div><strong>ExamPrep</strong><span>PERSONAL ENGINE</span></div></div>
       <div className="nav">
@@ -572,6 +572,8 @@ export default function App() {
             <div className="progress"><progress aria-label="Question position" value={session.index+1} max={session.questions.length}/></div>
           </div>
           <div className="exam-shell">
+            {navigatorOpen&&<button type="button" className="exam-nav-backdrop" tabIndex={-1}
+              aria-label="Close question navigator" onClick={()=>setNavigatorOpen(false)}/>}
             <section className="panel questionpanel" aria-labelledby="exam-question-heading">
               <div className="sectionhead">
                 <span className="pill">{q.type==='multiple_choice'?'Select all that apply':'Select one answer'}</span>
@@ -627,7 +629,9 @@ export default function App() {
           <nav className="exam-actions" aria-label="Question actions">
             <button type="button" className="secondary" disabled={session.index===0}
               onClick={()=>move(session.index-1)}>← Previous</button>
-            <span className="exam-actions-note">Your answers are saved locally</span>
+            <span className="exam-actions-note">{saveStatus==='saved'?'Saved locally':saveStatus==='saving'?'Saving progress…':'Save failed — retry above'}</span>
+            <button type="button" className="danger exam-submit-small"
+              onClick={()=>{if(window.confirm(submissionReview(session)))completeExam(session);}}>Submit exam</button>
             <button type="button" className="primary" disabled={session.index===session.questions.length-1}
               onClick={()=>move(session.index+1)}>Next →</button>
           </nav>
