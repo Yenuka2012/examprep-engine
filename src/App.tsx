@@ -622,7 +622,6 @@ export default function App() {
               <div className="sectionhead"><h3>Question navigator</h3>
                 <button type="button" className="subtle exam-nav-close" onClick={()=>setNavigatorOpen(false)}>
                   <X size={17}/> Close</button></div>
-              <p className="exam-nav-summary">{overview.answered} answered · {overview.unanswered} unanswered · {overview.flagged} flagged</p>
               <label className="navigator-filter">Show questions
                 <select aria-label="Question navigator filter" value={navigatorFilter}
                   onChange={e=>setNavigatorFilter(e.target.value as NavigatorFilter)}>
