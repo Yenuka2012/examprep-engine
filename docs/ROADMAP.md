@@ -57,7 +57,7 @@
 - Phase B: versioned schema 2.0 for matching, ordering, classification, cloze, numeric, matrix and hotspot questions; preserve schema 1.0.
 - Phase C: multi-question cases, exhibits and structured simulation tasks. Phase D: optional private-host lab work and transparent simulated adaptive practice.
 - Keep source exam data, session persistence, historical scores, encrypted backups and vault cutover independently reviewed. **Design-only: no migration or deployment authorized.**
-- [Technical UI and question-format plan](docs/features/EXAM-UI-V2-QUESTION-TYPE-ROADMAP.md) · [issue #136](https://github.com/Yenuka2012/examprep-engine/issues/136).
+- [Technical UI and question-format plan](features/EXAM-UI-V2-QUESTION-TYPE-ROADMAP.md) · [issue #136](https://github.com/Yenuka2012/examprep-engine/issues/136).
 
 ## Release v0.4 — reliability and content quality
 - Optional IndexedDB encrypted-at-rest vault with reviewed key lifecycle.
