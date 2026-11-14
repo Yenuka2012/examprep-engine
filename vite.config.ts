@@ -2,7 +2,7 @@ import {defineConfig} from 'vite';
 import react from '@vitejs/plugin-react';
 import {VitePWA} from 'vite-plugin-pwa';
 export default defineConfig(({mode})=>{
-  const mixedCandidateBase = mode==='mixed-cutover' ? '/examprep-candidate/' : '/examprep-engine/';
+  const mixedCandidateBase = mode==='ubuntu' ? '/' : mode==='mixed-cutover' ? '/examprep-candidate/' : '/examprep-engine/';
   return {
   plugins:[
     react(),
@@ -32,6 +32,6 @@ export default defineConfig(({mode})=>{
     })
   ],
   base:mixedCandidateBase,
-  build:{outDir:'dist',sourcemap:false}
+  build:{outDir:mode==='ubuntu'?'dist-ubuntu':'dist',sourcemap:false}
 };
 });
