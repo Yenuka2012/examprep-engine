@@ -18,6 +18,10 @@ on:
       - 'scripts/verify-owner-pwa-build.mjs'
       - 'scripts/verify-vault-runtime-boundary.mjs'
       - 'package.json'
+      - 'vite.config.ts'
+      - 'index.html'
+      - 'playwright.config.ts'
+      - 'scripts/verify-hosting-builds.mjs'
       - '.github/workflows/m2-staging.yml'
   workflow_dispatch:
 permissions:
@@ -41,6 +45,11 @@ jobs:
         run: npm ci --no-fund
       - name: Generate local schema validators
         run: npm run generate:validator
+      - name: Build both Pages and Ubuntu static hosting targets
+        run: |
+          npm run build:pages
+          npm run build:ubuntu
+          npm run verify:hosting
       - name: Verify isolated vault runtime dependency graph
         run: npm run verify:vault-runtime
       - name: Compile separate HTTPS owner staging application (synthetic only)
