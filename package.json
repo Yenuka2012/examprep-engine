@@ -23,7 +23,14 @@
     "test:e2e:mixed": "playwright test --config playwright.mixed.config.ts",
     "build:vault-test": "vite build --config vite.vault.config.ts",
     "preview:vault-test": "vite preview --config vite.vault.config.ts",
-    "test:e2e:vault": "playwright test --config playwright.vault.config.ts"
+    "test:e2e:vault": "playwright test --config playwright.vault.config.ts",
+    "build:owner-staging": "vite build --config vite.owner-staging.config.ts",
+    "verify:owner-pwa": "node scripts/verify-owner-pwa-build.mjs",
+    "test:e2e:owner-pwa": "playwright test --config playwright.owner-pwa.config.ts",
+    "verify:vault-runtime": "node scripts/verify-vault-runtime-boundary.mjs",
+    "build:pages": "npm run build",
+    "build:ubuntu": "npm run generate:validator && vite build --mode ubuntu",
+    "verify:hosting": "node scripts/verify-hosting-builds.mjs"
   },
   "dependencies": {
     "ajv": "8.20.0",

@@ -14,7 +14,8 @@ export default defineConfig({
   projects:[
     {name:'chromium',testIgnore:'**/mobile.spec.ts',use:{...devices['Desktop Chrome']}},
     {name:'webkit',testIgnore:'**/mobile.spec.ts',use:{...devices['Desktop Safari']}},
-    {name:'mobile-webkit',testMatch:'**/mobile.spec.ts',use:{...devices['iPhone 13']}}
+    {name:'mobile-webkit',testMatch:'**/mobile.spec.ts',use:{...devices['iPhone 13']}},
+    {name:'tablet-webkit',testMatch:'**/mobile.spec.ts',use:{...devices['iPad Pro 11']}}
   ],
   webServer:{
     command:'npm run build && npm run preview -- --host 127.0.0.1 --port 4173 --strictPort',

@@ -3,7 +3,9 @@
  * TypeScript 7 intentionally has no stable compiler API. Instead, pin EVERY
  * ordinary production source/build entry to its reviewed v0.3.2 release-candidate blob.
  * Only the separately built synthetic vault and cutover modules may differ.
- * Stage A PR #142 updates the reviewed App/styles pins only; this is a
+ * M2 PR #143 independently pins the reviewed Pages/Ubuntu base-path build changes,
+ * pure backup-validator boundary, and additive data contracts; no encrypted
+ * owner runtime is bundled in production Pages. Earlier Stage A #142 was a
  * release-candidate security baseline update, NOT production authorization.
  * See docs/security/EXAM-UI-V2-STAGE-A-ISOLATION-REVIEW.md.
  * Build output is independently scanned for the vault test database/fixtures.
@@ -15,7 +17,7 @@ import {resolve,relative,join} from 'node:path';
 
 const root=resolve(process.cwd());
 const frozen={
-  "index.html": "8c89659de53b7857228fecbd0c663a3fc870c696",
+  "index.html": "41c5c0a69408f61c95ffe88cdd404762ce750185",
   "public/favicon.svg": "778ad69298b6b89045dc8b0a924f85c27bf1c48d",
   "scripts/generate-validator.mjs": "afac5049c68a8a28f07679bc1e9f1a4655da6633",
   "src/App.tsx": "81705d5b10a891b35d3817ef79c2d07192a2bd48",
@@ -24,16 +26,22 @@ const frozen={
   "src/PwaStatus.tsx": "dcb531a4b3e2965b46a019628c4b187f7d92f5e0",
   "src/StorageCompatibilityStatus.tsx": "cf7cf0ebf21d2e5192d914bf005dd2cf9157c9f2",
   "src/backup.test.ts": "9a9548cd28e625e3a8663dff43f46f46f3964c6b",
-  "src/backup.ts": "97f8f628d98f8e3d019ea4ef1f9f035f64cac73a",
+  "src/backup.ts": "5d89ce1ba153d34a76182585cc5e572bdd86bcbd",
   "src/backupSize.test.ts": "df495406a3e0f76aba1bfc72be0ff4c3f2c332d8",
   "src/backupSize.ts": "dac7f2597827a79ef1ace628bbe857ad5468c86a",
   "src/catalog.test.ts": "77e87783ebecca105094082e3f7624bd4b72f3e7",
   "src/catalog.ts": "d98fcf90df239e86a36315e1d9c25b2d5f945983",
+  // M2 staging: pure catalog validator is included but production still imports catalog.ts.
+  "src/catalogValidation.ts": "0a1f397d038232909cb68a3f47ea0b4dc42b9bfb",
   "src/catalogBackup.test.ts": "0a97e3ea5120a09e74f311ab32b6cf0ed0b07115",
   "src/crypto.test.ts": "2822f2807da6129388fa52035c17f6c0cb6b016e",
   "src/crypto.ts": "7349bda364b95afffe080fb04f25ad00504fc5ae",
   "src/cutoverSafety.test.ts": "3bda350ed7f8d037cc0e84bda1a6b1bf07e3bf81",
   "src/cutoverSafety.ts": "3679b282697bc4e7bd9f575570c6ab05cdaae397",
+  // M2.1 additive read-only adapter contract; exact blobs are release-locked.
+  "src/data/repository.ts": "458393b82fcc648473fc2c730fba305309114e84",
+  "src/data/indexeddbReadRepository.ts": "5c73aa8d17543af6b0fda8e0f7d8cecab3ad48c6",
+  "src/data/indexeddbReadRepository.test.ts": "846d02e1d8b3fe3a301a36bc6c92809db38a90fb",
   "src/db.ts": "621263167fe537b7024356f9fd067cffd3acdb52",
   "src/examUx.test.ts": "f99c77e20c87eca6505ad071cb690b10b0a89b97",
   "src/examUx.ts": "4e8671fab757572463b42469ce1a03cde2a4d260",
@@ -63,7 +71,7 @@ const frozen={
   "src/styles.css": "6607c31dc52a296c76e6159f6394d30727a09db1",
   "src/types.ts": "0795739bbac673100aaea97a98ad528623f77f79",
   "src/vite-env.d.ts": "64251fba07826fb9f05570afb6d4b7d2b0cea3a2",
-  "vite.config.ts": "78a2af5c70ca0c799de690a7bdfef8d5593cce71"
+  "vite.config.ts": "da9af2e40079b99f858367df6a946c99385ce3ef"
 };
 const excluded=['src/vault/','src/cutover/','src/generated/'];
 function fail(message){throw new Error('Production isolation gate failed: '+message);}
