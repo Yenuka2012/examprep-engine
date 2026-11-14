@@ -3,7 +3,9 @@
  * TypeScript 7 intentionally has no stable compiler API. Instead, pin EVERY
  * ordinary production source/build entry to its reviewed v0.3.2 release-candidate blob.
  * Only the separately built synthetic vault and cutover modules may differ.
- * Stage A PR #142 updates the reviewed App/styles pins only; this is a
+ * M2 PR #143 independently pins the reviewed Pages/Ubuntu base-path build changes,
+ * pure backup-validator boundary, and additive data contracts; no encrypted
+ * owner runtime is bundled in production Pages. Earlier Stage A #142 was a
  * release-candidate security baseline update, NOT production authorization.
  * See docs/security/EXAM-UI-V2-STAGE-A-ISOLATION-REVIEW.md.
  * Build output is independently scanned for the vault test database/fixtures.
@@ -15,7 +17,7 @@ import {resolve,relative,join} from 'node:path';
 
 const root=resolve(process.cwd());
 const frozen={
-  "index.html": "8c89659de53b7857228fecbd0c663a3fc870c696",
+  "index.html": "41c5c0a69408f61c95ffe88cdd404762ce750185",
   "public/favicon.svg": "778ad69298b6b89045dc8b0a924f85c27bf1c48d",
   "scripts/generate-validator.mjs": "afac5049c68a8a28f07679bc1e9f1a4655da6633",
   "src/App.tsx": "81705d5b10a891b35d3817ef79c2d07192a2bd48",
@@ -69,7 +71,7 @@ const frozen={
   "src/styles.css": "6607c31dc52a296c76e6159f6394d30727a09db1",
   "src/types.ts": "0795739bbac673100aaea97a98ad528623f77f79",
   "src/vite-env.d.ts": "64251fba07826fb9f05570afb6d4b7d2b0cea3a2",
-  "vite.config.ts": "78a2af5c70ca0c799de690a7bdfef8d5593cce71"
+  "vite.config.ts": "da9af2e40079b99f858367df6a946c99385ce3ef"
 };
 const excluded=['src/vault/','src/cutover/','src/generated/'];
 function fail(message){throw new Error('Production isolation gate failed: '+message);}
