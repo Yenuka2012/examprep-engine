@@ -29,11 +29,17 @@ const frozen={
   "src/backupSize.ts": "dac7f2597827a79ef1ace628bbe857ad5468c86a",
   "src/catalog.test.ts": "77e87783ebecca105094082e3f7624bd4b72f3e7",
   "src/catalog.ts": "d98fcf90df239e86a36315e1d9c25b2d5f945983",
+  // M2 staging: pure catalog validator is included but production still imports catalog.ts.
+  "src/catalogValidation.ts": "0a1f397d038232909cb68a3f47ea0b4dc42b9bfb",
   "src/catalogBackup.test.ts": "0a97e3ea5120a09e74f311ab32b6cf0ed0b07115",
   "src/crypto.test.ts": "2822f2807da6129388fa52035c17f6c0cb6b016e",
   "src/crypto.ts": "7349bda364b95afffe080fb04f25ad00504fc5ae",
   "src/cutoverSafety.test.ts": "3bda350ed7f8d037cc0e84bda1a6b1bf07e3bf81",
   "src/cutoverSafety.ts": "3679b282697bc4e7bd9f575570c6ab05cdaae397",
+  // M2.1 additive read-only adapter contract; exact blobs are release-locked.
+  "src/data/repository.ts": "458393b82fcc648473fc2c730fba305309114e84",
+  "src/data/indexeddbReadRepository.ts": "5c73aa8d17543af6b0fda8e0f7d8cecab3ad48c6",
+  "src/data/indexeddbReadRepository.test.ts": "846d02e1d8b3fe3a301a36bc6c92809db38a90fb",
   "src/db.ts": "621263167fe537b7024356f9fd067cffd3acdb52",
   "src/examUx.test.ts": "f99c77e20c87eca6505ad071cb690b10b0a89b97",
   "src/examUx.ts": "4e8671fab757572463b42469ce1a03cde2a4d260",
