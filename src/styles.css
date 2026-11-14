@@ -62,3 +62,146 @@
 .backup-safety-guide summary{cursor:pointer;color:#cbd6ff;font-weight:600}
 .backup-safety-guide ol{padding-left:22px;color:#b5c1d7;font-size:13px;line-height:1.7}
 @media(max-width:600px){.insight-line{flex-direction:column}}
+
+/* Stage A — responsive, accessible, presentation-only examination workspace.
+   Scoped to active exams; no change to persistence, grading or ownership. */
+.sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.app.exam-active{background:#eef2f8}
+.exam-active .main{max-width:none;padding:24px clamp(14px,2.4vw,42px);color:#15213a}
+.exam-active .top{margin-bottom:16px}
+.exam-active .top h1{color:#182743;font-size:25px}
+.exam-focus .sidebar,.exam-focus .top{display:none}
+.exam-focus .main{padding:12px clamp(10px,2vw,34px);width:100%}
+.exam-stage{--ex-bg:#f7f9fd;--ex-panel:#fff;--ex-ink:#14213b;--ex-muted:#52637c;
+  --ex-line:#d4ddeb;--ex-blue:#205bd3;--ex-choice:#f9fbff;--ex-hover:#eaf1ff;
+  --ex-select:#e6efff;--ex-field:#f9fbff;--ex-tag:#e8efff;
+  color:var(--ex-ink);background:var(--ex-bg);border:1px solid var(--ex-line);
+  padding:clamp(12px,1.7vw,23px);border-radius:16px;min-width:0;gap:16px}
+.exam-stage.theme-dark{--ex-bg:#0f1726;--ex-panel:#172437;--ex-ink:#f0f5ff;
+  --ex-muted:#bdcce5;--ex-line:#394e68;--ex-blue:#a8c0ff;--ex-choice:#1c2b40;
+  --ex-hover:#243954;--ex-select:#294269;--ex-field:#1e2d42;--ex-tag:#253c60}
+.exam-stage .panel,.exam-stage .examtoolbar{color:var(--ex-ink);
+  background:var(--ex-panel);border:1px solid var(--ex-line);box-shadow:0 2px 12px #111c3210}
+.exam-stage .panel{padding:clamp(18px,2vw,30px)}
+.exam-stage .examtoolbar{padding:16px clamp(14px,2vw,22px);gap:16px}
+.exam-title{display:grid;gap:5px;min-width:0}
+.exam-title .eyebrow{color:var(--ex-blue);font-size:11px;letter-spacing:1.1px}
+.exam-title strong{font-size:clamp(16px,1.35vw,22px);line-height:1.35;overflow-wrap:anywhere}
+.exam-subtitle{color:var(--ex-muted);font-size:12px;line-height:1.45}
+.exam-head-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.exam-stage .timer{color:var(--ex-ink);display:flex;align-items:center;gap:9px;
+  font-variant-numeric:tabular-nums;padding:6px 10px;border:1px solid var(--ex-line);
+  border-radius:10px;white-space:nowrap}
+.exam-stage .timer small{display:block;font-size:10px;font-weight:500;letter-spacing:.3px;color:var(--ex-muted)}
+.exam-stage .timer strong{font-size:20px}
+.exam-stage .timer.urgent,.exam-stage .timer.urgent small{color:#c43e35}
+.exam-stage.theme-dark .timer.urgent,.exam-stage.theme-dark .timer.urgent small{color:#ffaaa3}
+.exam-utility{display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  min-width:44px;min-height:44px;background:var(--ex-field);color:var(--ex-ink);
+  border:1px solid var(--ex-line);border-radius:10px;font-weight:650;font-size:13px;padding:8px}
+.exam-utility:hover,.exam-utility[aria-pressed=true]{background:var(--ex-hover);border-color:var(--ex-blue)}
+.exam-stage button:focus-visible,.exam-stage select:focus-visible,.exam-stage input:focus-visible{
+  outline:3px solid var(--ex-blue);outline-offset:3px}
+.exam-nav-toggle,.exam-nav-close,.exam-nav-backdrop{display:none}
+.exam-overview{display:grid;gap:11px;background:var(--ex-panel);border:1px solid var(--ex-line);
+  border-radius:12px;padding:16px 18px}
+.exam-progress-heading{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+.exam-progress-heading strong{font-size:15px}
+.exam-progress-heading span{font-size:12px;color:var(--ex-muted)}
+.exam-stage .progress,.exam-stage .progress progress{height:9px;background:var(--ex-line)}
+.exam-stage .progress progress::-webkit-progress-bar{background:var(--ex-line)}
+.exam-stage .progress progress::-webkit-progress-value{background:#2563eb}
+.exam-stage .progress progress::-moz-progress-bar{background:#2563eb}
+.exam-shell{display:grid;grid-template-columns:minmax(0,1fr) minmax(265px,315px);
+  gap:16px;align-items:start;min-width:0}
+.exam-stage .questionpanel{min-width:0}
+.exam-stage .questionpanel h2{color:var(--ex-ink);font-size:clamp(19px,1.75vw,25px);
+  line-height:1.55;margin:24px 0 25px;white-space:pre-wrap;overflow-wrap:anywhere}
+.exam-stage .pill{background:var(--ex-tag);color:var(--ex-blue);font-size:12px}
+.exam-stage .subtle{color:var(--ex-blue);min-height:44px}
+.exam-stage .choice-fieldset{border:0;padding:0;margin:0;min-width:0}
+.exam-stage .choices{gap:12px}
+.exam-stage .choice{color:var(--ex-ink);background:var(--ex-choice);
+  border:1px solid var(--ex-line);min-height:58px;line-height:1.5;padding:15px;align-items:center}
+.exam-stage .choice:hover{background:var(--ex-hover);border-color:var(--ex-blue)}
+.exam-stage .choice.selected{background:var(--ex-select);border:2px solid #2865e0;padding:14px}
+.exam-stage.theme-dark .choice.selected{border-color:#b0c5ff}
+.exam-stage .choice input{width:18px;height:18px;flex:none;accent-color:#2563eb}
+.exam-stage .letter{background:var(--ex-tag);color:var(--ex-blue);font-size:13px;min-width:30px;min-height:30px}
+.exam-stage .exam-navigator{min-width:0}
+.exam-stage .exam-navigator h3{font-size:16px;margin:0}
+.exam-nav-summary{font-size:12px;color:var(--ex-muted);line-height:1.5;margin:14px 0}
+.exam-stage .navigator-filter{display:grid;gap:7px;margin:16px 0;color:var(--ex-muted)}
+.exam-stage .navigator-filter select{width:100%;max-width:none;background:var(--ex-field);
+  border-color:var(--ex-line);color:var(--ex-ink);min-height:44px}
+.exam-stage .numbergrid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:7px;margin:16px 0}
+.exam-stage .num{height:44px;min-width:0;width:100%;color:var(--ex-ink);
+  border:1px solid var(--ex-line);background:var(--ex-field);font-weight:600}
+.exam-stage .num.answered{background:#d8f3e7;border-color:#62ad8f;color:#144f37}
+.exam-stage .num.flagged{box-shadow:inset 0 -4px 0 #e3a239}
+.exam-stage .num.current{outline:3px solid #2469e9;outline-offset:1px}
+.exam-stage.theme-dark .num.answered{background:#174b45;color:#d9fff0;border-color:#4faf98}
+.exam-stage.theme-dark .num.current{outline-color:#aac5ff}
+.exam-legend{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px;padding:16px 0 5px;border-top:1px solid var(--ex-line)}
+.exam-legend span{display:flex;gap:8px;align-items:center;color:var(--ex-muted);font-size:12px}
+.legend-swatch{width:17px;height:17px;display:inline-block;border-radius:4px;flex:none;border:1px solid var(--ex-line)}
+.legend-swatch.answered{background:#73c8a5;border-color:#499574}
+.legend-swatch.unanswered{background:var(--ex-field)}
+.legend-swatch.current{border:3px solid #2469e9}
+.legend-swatch.flagged{border-bottom:5px solid #e3a239}
+.exam-stage .examend{border-color:var(--ex-line);margin-top:15px;padding-top:15px}
+.exam-stage .danger{min-height:44px;width:100%;background:#9c3043;color:#fff}
+.exam-actions{position:sticky;bottom:0;z-index:5;display:flex;align-items:center;justify-content:space-between;
+  gap:12px;background:var(--ex-panel);border:1px solid var(--ex-line);
+  border-radius:12px;padding:12px;box-shadow:0 -3px 22px #0c18351c}
+.exam-actions button{min-height:44px;min-width:120px}
+.exam-actions .secondary{background:var(--ex-field);color:var(--ex-ink);border-color:var(--ex-line)}
+.exam-actions .primary{background:#205bd3;color:white}
+.exam-actions-note{color:var(--ex-muted);font-size:12px;text-align:center}
+.exam-stage .exam-save-status{margin:0;background:#deefe7;border:1px solid #90c6aa;color:#154f36}
+.exam-stage .exam-save-status.warn{background:#fff1d6;border-color:#ddb160;color:#6a3d00}
+.exam-stage.theme-dark .exam-save-status{background:#1b3b36;color:#d8f4e6;border-color:#3d7966}
+.exam-stage.theme-dark .exam-save-status.warn{background:#543e24;color:#fff2d8;border-color:#99734c}
+.exam-stage .exam-save-status button{color:inherit}
+.exam-stage .alert.warn:not(.exam-save-status){color:#573b13;background:#fff1d7;border:1px solid #e0b97c}
+.exam-stage.theme-dark .alert.warn:not(.exam-save-status){color:#ffe8bb;background:#503a25}
+.exam-actions .exam-submit-small{display:none}
+@media(max-width:1100px){
+  .exam-shell{grid-template-columns:minmax(0,1fr)}
+  .exam-stage .exam-navigator{display:none}
+  .exam-stage .exam-nav-backdrop{display:block;position:fixed;inset:0;z-index:25;
+    background:#061224a0;border:0;border-radius:0}
+  .exam-stage .exam-navigator.drawer-open{display:block;position:fixed;top:0;right:0;bottom:0;
+    width:min(400px,100vw);overflow-y:auto;z-index:30;border-radius:0;
+    box-shadow:-12px 0 60px #0005;padding:20px;padding-bottom:max(20px,env(safe-area-inset-bottom))}
+  .exam-stage .exam-navigator .exam-nav-close{display:inline-flex}
+  .exam-stage .exam-nav-toggle{display:inline-flex}
+  .exam-actions{flex-wrap:wrap}
+  .exam-stage .exam-actions .exam-submit-small{display:inline-flex;width:auto;min-width:120px}
+}
+@media(max-width:700px){
+  .exam-active .main{padding:12px}
+  .exam-stage{padding:10px;gap:12px;border-radius:12px}
+  .exam-stage .examtoolbar{align-items:flex-start;flex-direction:column}
+  .exam-stage .exam-title strong{font-size:16px}
+  .exam-head-controls{width:100%;justify-content:space-between}
+  .exam-stage .timer{padding:5px 7px}
+  .exam-stage .timer strong{font-size:17px}
+  .exam-stage .questionpanel{padding:17px}
+  .exam-stage .questionpanel h2{font-size:18px;line-height:1.55}
+  .exam-stage .choice{padding:12px;align-items:center}
+  .exam-stage .choice.selected{padding:11px}
+  .exam-progress-heading{align-items:flex-start}
+  .exam-actions{bottom:0;bottom:env(safe-area-inset-bottom);gap:8px;flex-wrap:wrap}
+  .exam-actions-note{display:none}
+  .exam-actions button{min-width:0;flex:1 1 30%;padding:10px 8px}
+  .exam-stage .exam-nav-toggle{font-size:12px}
+}
+@media(prefers-reduced-motion:reduce){
+  .exam-stage *, .exam-stage *::before, .exam-stage *::after{scroll-behavior:auto!important;transition:none!important}
+}
+
+/* Keep the surrounding workspace consistent with the optional dark exam palette. */
+.app.exam-active:has(.exam-stage.theme-dark){background:#0b1020}
+.app.exam-active:has(.exam-stage.theme-dark) .top h1{color:#f0f5ff}
