@@ -29,6 +29,17 @@ test('mobile WebKit import, responsive exam and encrypted backup export',async({
   await page.getByRole('button',{name:'Start examination'}).click();
   await expect(page.getByText('Which choice is best for offline private data?')).toBeVisible();
   await page.getByRole('radio').first().check();
+  await expect(page.getByRole('button',{name:'Questions'})).toBeVisible();
+  await page.getByRole('button',{name:'Questions'}).click();
+  await expect(page.getByRole('dialog',{name:'Question navigator'})).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog',{name:'Question navigator'})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Submit exam'})).toBeVisible();
+  const examWidth=await page.evaluate(()=>({
+    viewport:document.documentElement.clientWidth,
+    page:document.documentElement.scrollWidth
+  }));
+  expect(examWidth.page).toBeLessThanOrEqual(examWidth.viewport+2);
   page.once('dialog',dialog=>dialog.accept());
   await page.getByRole('button',{name:'Submit exam'}).click();
   await expect(page.getByText('EXAM COMPLETE')).toBeVisible();
