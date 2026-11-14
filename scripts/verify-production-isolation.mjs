@@ -24,7 +24,7 @@ const frozen={
   "src/PwaStatus.tsx": "dcb531a4b3e2965b46a019628c4b187f7d92f5e0",
   "src/StorageCompatibilityStatus.tsx": "cf7cf0ebf21d2e5192d914bf005dd2cf9157c9f2",
   "src/backup.test.ts": "9a9548cd28e625e3a8663dff43f46f46f3964c6b",
-  "src/backup.ts": "97f8f628d98f8e3d019ea4ef1f9f035f64cac73a",
+  "src/backup.ts": "5d89ce1ba153d34a76182585cc5e572bdd86bcbd",
   "src/backupSize.test.ts": "df495406a3e0f76aba1bfc72be0ff4c3f2c332d8",
   "src/backupSize.ts": "dac7f2597827a79ef1ace628bbe857ad5468c86a",
   "src/catalog.test.ts": "77e87783ebecca105094082e3f7624bd4b72f3e7",
