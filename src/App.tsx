@@ -8,7 +8,7 @@ import {getStorageUpdateMessage,subscribeStorageUpdate} from './storageVersionGu
 import CutoverReadinessPanel from './CutoverReadinessPanel';
 import CatalogPanel from './CatalogPanel';
 import { completeActiveExam, createActiveExam, loadActiveExam, saveActiveExam } from './examPersistence';
-import { BookOpen, BookMarked, Upload, BarChart3, ShieldCheck, Download, Trash2, ArrowLeft, CheckCircle2, Clock3, Flag, Shuffle, Play } from 'lucide-react';
+import { BookOpen, BookMarked, Upload, BarChart3, ShieldCheck, Download, Trash2, ArrowLeft, CheckCircle2, Clock3, Flag, Shuffle, Play, Moon, Sun, Maximize2, Minimize2, List, X } from 'lucide-react';
 import { db } from './db';
 import {withLegacyWritePermit} from './legacyWriteBarrier';
 import {jsonEqual} from './jsonEqual';
@@ -53,6 +53,11 @@ export default function App() {
   const [examSize,setExamSize]=useState(20);
   const [examMinutes,setExamMinutes]=useState(30);
   const [navigatorFilter,setNavigatorFilter]=useState<NavigatorFilter>('all');
+  // Presentation-only; intentionally not part of persisted exam state.
+  const [examTheme,setExamTheme]=useState<'light'|'dark'>('light');
+  const [examFocus,setExamFocus]=useState(false);
+  const [navigatorOpen,setNavigatorOpen]=useState(false);
+  const questionHeadingRef=useRef<HTMLHeadingElement|null>(null);
   const [domain,setDomain]=useState('ALL');
   const [error,setError]=useState('');
   const [notice,setNotice]=useState('');
@@ -268,6 +273,7 @@ export default function App() {
       };
       const actual=await createActiveExam(proposed);
       setNavigatorFilter('all');
+      setNavigatorOpen(false);
       setViewResult(null);setSession(actual);setNow(Date.now());setExamAccess('owner');setPage('exam');
     }catch{
       await lock.release();
@@ -284,7 +290,11 @@ export default function App() {
       return {...old,answers:{...old.answers,[id]:next}};
     });
   }
-  function move(index:number){if(examAccess!=='owner')return;setSession(old=>old?{...old,index:Math.max(0,Math.min(old.questions.length-1,index))}:old);}
+  function move(index:number){
+    if(examAccess!=='owner')return;
+    setNavigatorOpen(false);
+    setSession(old=>old?{...old,index:Math.max(0,Math.min(old.questions.length-1,index))}:old);
+  }
   function flag(){if(examAccess!=='owner')return;setSession(old=>old?{...old,marked:old.marked.includes(old.questions[old.index].id)?old.marked.filter(x=>x!==old.questions[old.index].id):[...old.marked,old.questions[old.index].id]}:old);}
   function saveEncryptedJson(data:EncryptedBackup,filename:string){
     const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
@@ -386,7 +396,33 @@ export default function App() {
   }),[attempts,historyCertFilter,historyScoreFilter,historyDateFrom,historyDateTo]);
   const weakDomainPriorities=useMemo(()=>weakestDomains(domainStats),[domainStats]);
   const resultBreakdown=useMemo(()=>viewResult?attemptReview(viewResult):null,[viewResult]);
-  return <div className="app">
+  const isActiveExam=page==='exam'&&!!session&&examAccess==='owner'&&!storageUpdateMessage;
+  // Announce newly opened questions without stealing focus when answers change.
+  useEffect(()=>{
+    if(isActiveExam)questionHeadingRef.current?.focus();
+  },[isActiveExam,session?.index]);
+  // The narrow-screen navigator behaves as a keyboard-accessible drawer.
+  useEffect(()=>{
+    if(!navigatorOpen)return;
+    const drawer=document.getElementById('exam-question-navigator');
+    const opener=document.querySelector<HTMLButtonElement>('.exam-nav-toggle');
+    const close=drawer?.querySelector<HTMLButtonElement>('.exam-nav-close');
+    close?.focus();
+    const onKey=(event:KeyboardEvent)=>{
+      if(event.key==='Escape'){
+        event.preventDefault();setNavigatorOpen(false);opener?.focus();return;
+      }
+      if(event.key!=='Tab'||!drawer)return;
+      const controls=Array.from(drawer.querySelectorAll<HTMLElement>('button:not([disabled]),select:not([disabled])'));
+      if(!controls.length)return;
+      const first=controls[0],last=controls[controls.length-1];
+      if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
+      else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+    };
+    document.addEventListener('keydown',onKey);
+    return()=>document.removeEventListener('keydown',onKey);
+  },[navigatorOpen]);
+  return <div className={'app'+(isActiveExam?' exam-active':'')+(isActiveExam&&examFocus?' exam-focus':'')}>
     <aside className="sidebar">
       <div className="brand"><BookOpen size={26}/><div><strong>ExamPrep</strong><span>PERSONAL ENGINE</span></div></div>
       <div className="nav">
@@ -522,45 +558,110 @@ export default function App() {
         const overview=examOverview(session);
         const navigator=navigatorItems(session,navigatorFilter);
         const timeNotice=examTimeNotice(timeLeft);
-        return <div className="stack">
-        <section role="status" aria-live="polite" className={'alert '+(saveStatus==='failed'?'warn':'')}>
-          {saveStatus==='saved'?'Exam progress saved locally.':saveStatus==='saving'?'Saving exam progress…':'Autosave failed. Latest changes may be unsaved.'}
-          {saveStatus==='failed'&&<button onClick={retrySave}>Retry save</button>}
-        </section>
-        <section className="examtoolbar"><div><span className="eyebrow">{session.bank.certification} · {q.domain}</span><strong>Question {session.index+1} of {session.questions.length}</strong></div><div className={'timer '+(timeLeft<60?'urgent':'')}><Clock3 size={18}/> {fmtTime(timeLeft)}</div></section>
-        {timeNotice&&<div className="alert warn" role="status" aria-live="polite">{timeNotice}</div>}
-        <div className="progress"><progress aria-label="Exam progress" value={session.index+1} max={session.questions.length}/></div>
-        <section className="panel questionpanel"><div className="sectionhead"><span className="pill">{q.type==='multiple_choice'?'Select all that apply':'Select one answer'}</span><button className="subtle" onClick={flag}><Flag size={16}/> {session.marked.includes(q.id)?'Unflag':'Flag'}</button></div><h2>{q.question}</h2><div className="choices">{q.options.map(o=><label className={'choice '+(picked.includes(o.id)?'selected':'')} key={o.id}><input type={q.type==='multiple_choice'?'checkbox':'radio'} name={'choice-'+q.id} checked={picked.includes(o.id)} onChange={()=>answer(q.id,o.id,q.type==='multiple_choice')}/><span className="letter">{o.id}</span><span>{o.text}</span></label>)}</div></section>
-        <section className="panel">
-          <div className="sectionhead"><h3>Question navigator</h3>
-            <span className="muted">{overview.answered} answered · {overview.unanswered} unanswered · {overview.flagged} flagged</span>
+        const marked=session.marked.includes(q.id);
+        return <div className={'stack exam-stage theme-'+examTheme}>
+          <section role="status" aria-live="polite" className={'alert exam-save-status '+(saveStatus==='failed'?'warn':'')}>
+            {saveStatus==='saved'?'Exam progress saved locally.':saveStatus==='saving'?'Saving exam progress…':'Autosave failed. Latest changes may be unsaved.'}
+            {saveStatus==='failed'&&<button type="button" onClick={retrySave}>Retry save</button>}
+          </section>
+          <section className="examtoolbar" aria-label="Active examination">
+            <div className="exam-title">
+              <span className="eyebrow">EXAM SIMULATION · {session.bank.certification}</span>
+              <strong>{session.bank.title}</strong>
+              <span className="exam-subtitle">{q.domain} · Answers are shown after submission</span>
+            </div>
+            <div className="exam-head-controls">
+              <div className={'timer '+(timeLeft<=60?'urgent':'')} role="timer" aria-live="off" aria-label={'Time remaining '+fmtTime(timeLeft)}>
+                <Clock3 size={19} aria-hidden="true"/><span><small>Time remaining</small><strong>{fmtTime(timeLeft)}</strong></span>
+              </div>
+              <button type="button" className="exam-utility" aria-pressed={examTheme==='dark'}
+                aria-label={examTheme==='dark'?'Use light exam theme':'Use dark exam theme'}
+                onClick={()=>setExamTheme(current=>current==='light'?'dark':'light')}>
+                {examTheme==='dark'?<Sun size={19}/>:<Moon size={19}/>}
+              </button>
+              <button type="button" className="exam-utility" aria-pressed={examFocus}
+                aria-label={examFocus?'Exit focus mode':'Enter focus mode'}
+                onClick={()=>setExamFocus(current=>!current)}>
+                {examFocus?<Minimize2 size={19}/>:<Maximize2 size={19}/>}
+              </button>
+              <button type="button" className="exam-utility exam-nav-toggle"
+                aria-expanded={navigatorOpen} aria-controls="exam-question-navigator"
+                onClick={()=>setNavigatorOpen(open=>!open)}><List size={18}/> Questions</button>
+            </div>
+          </section>
+          {timeNotice&&<div className="alert warn" role="status" aria-live="polite">{timeNotice}</div>}
+          <div className="exam-overview">
+            <div className="exam-progress-heading">
+              <strong>Question {session.index+1} of {session.questions.length}</strong>
+              <span>{overview.answered} answered · {overview.unanswered} unanswered · {overview.flagged} flagged</span>
+            </div>
+            <div className="progress"><progress aria-label="Question position" value={session.index+1} max={session.questions.length}/></div>
           </div>
-          <label className="navigator-filter">Show questions
-            <select aria-label="Question navigator filter" value={navigatorFilter}
-              onChange={e=>setNavigatorFilter(e.target.value as NavigatorFilter)}>
-              <option value="all">All ({overview.total})</option>
-              <option value="answered">Answered ({overview.answered})</option>
-              <option value="unanswered">Unanswered ({overview.unanswered})</option>
-              <option value="flagged">Flagged ({overview.flagged})</option>
-            </select>
-          </label>
-          {navigator.length?<div className="numbergrid">{navigator.map(({id,index})=>
-            <button key={id} title={'Question '+(index+1)}
-              aria-label={'Go to question '+(index+1)}
-              className={'num '+(index===session.index?'current ':'')+
-                ((session.answers[id]??[]).length?'answered ':'')+
-                (session.marked.includes(id)?'flagged':'')}
-              onClick={()=>move(index)}>{index+1}</button>)}</div>:
-            <p className="muted" role="status">No questions match this filter. Choose All to see the full paper.</p>}
-          <div className="actions spread"><button className="secondary"
-            disabled={session.index===0} onClick={()=>move(session.index-1)}>← Previous</button>
-            <button className="secondary" disabled={session.index===session.questions.length-1}
-              onClick={()=>move(session.index+1)}>Next →</button></div>
-          <div className="examend"><button className="danger"
-            onClick={()=>{if(window.confirm(submissionReview(session)))completeExam(session);}}>
-            Submit exam</button></div>
-        </section>
-      </div>;})()}
+          <div className="exam-shell">
+            {navigatorOpen&&<button type="button" className="exam-nav-backdrop" tabIndex={-1}
+              aria-label="Close question navigator" onClick={()=>setNavigatorOpen(false)}/>}
+            <section className="panel questionpanel" aria-labelledby="exam-question-heading">
+              <div className="sectionhead">
+                <span className="pill">{q.type==='multiple_choice'?'Select all that apply':'Select one answer'}</span>
+                <button type="button" className="subtle" onClick={flag} aria-pressed={marked}>
+                  <Flag size={16} aria-hidden="true"/> {marked?'Unflag':'Flag'}</button>
+              </div>
+              <h2 id="exam-question-heading" tabIndex={-1} ref={questionHeadingRef}>{q.question}</h2>
+              <fieldset className="choice-fieldset">
+                <legend className="sr-only">Answer choices for question {session.index+1}</legend>
+                <div className="choices">{q.options.map(o=><label className={'choice '+(picked.includes(o.id)?'selected':'')} key={o.id}>
+                  <input type={q.type==='multiple_choice'?'checkbox':'radio'} name={'choice-'+q.id}
+                    checked={picked.includes(o.id)} onChange={()=>answer(q.id,o.id,q.type==='multiple_choice')}/>
+                  <span className="letter" aria-hidden="true">{o.id}</span><span>{o.text}</span>
+                </label>)}</div>
+              </fieldset>
+            </section>
+            <aside id="exam-question-navigator" className={'panel exam-navigator'+(navigatorOpen?' drawer-open':'')}
+              role={navigatorOpen?'dialog':undefined} aria-modal={navigatorOpen?true:undefined}
+              aria-label="Question navigator">
+              <div className="sectionhead"><h3>Question navigator</h3>
+                <button type="button" className="subtle exam-nav-close" onClick={()=>setNavigatorOpen(false)}>
+                  <X size={17}/> Close</button></div>
+              <label className="navigator-filter">Show questions
+                <select aria-label="Question navigator filter" value={navigatorFilter}
+                  onChange={e=>setNavigatorFilter(e.target.value as NavigatorFilter)}>
+                  <option value="all">All ({overview.total})</option>
+                  <option value="answered">Answered ({overview.answered})</option>
+                  <option value="unanswered">Unanswered ({overview.unanswered})</option>
+                  <option value="flagged">Flagged ({overview.flagged})</option>
+                </select>
+              </label>
+              {navigator.length?<div className="numbergrid" role="group" aria-label="Jump to question">
+                {navigator.map(({id,index})=>{
+                  const answered=(session.answers[id]??[]).length>0;
+                  const flagged=session.marked.includes(id);
+                  return <button type="button" key={id} title={'Question '+(index+1)}
+                    aria-label={'Go to question '+(index+1)+(answered?', answered':', unanswered')+(flagged?', flagged for review':'')}
+                    aria-current={index===session.index?'step':undefined}
+                    className={'num '+(index===session.index?'current ':'')+(answered?'answered ':'')+(flagged?'flagged':'')}
+                    onClick={()=>move(index)}>{index+1}</button>;
+                })}</div>:
+                <p className="muted" role="status">No questions match this filter. Choose All to see the full paper.</p>}
+              <div className="exam-legend" aria-label="Question status legend">
+                <span><i className="legend-swatch answered"/>Answered</span>
+                <span><i className="legend-swatch unanswered"/>Unanswered</span>
+                <span><i className="legend-swatch current"/>Current</span>
+                <span><i className="legend-swatch flagged"/>Flagged</span>
+              </div>
+              <div className="examend"><button type="button" className="danger"
+                onClick={()=>{if(window.confirm(submissionReview(session)))completeExam(session);}}>Submit exam</button></div>
+            </aside>
+          </div>
+          <nav className="exam-actions" aria-label="Question actions">
+            <button type="button" className="secondary" disabled={session.index===0}
+              onClick={()=>move(session.index-1)}>← Previous</button>
+            <span className="exam-actions-note">{saveStatus==='saved'?'Saved locally':saveStatus==='saving'?'Saving progress…':'Save failed — retry above'}</span>
+            <button type="button" className="danger exam-submit-small"
+              onClick={()=>{if(window.confirm(submissionReview(session)))completeExam(session);}}>Submit exam</button>
+            <button type="button" className="primary" disabled={session.index===session.questions.length-1}
+              onClick={()=>move(session.index+1)}>Next →</button>
+          </nav>
+        </div>;})()}
       {page==='analytics'&&<div className="stack">
         <section className="stats"><div className="stat"><span>Completed exams</span><strong>{attempts.length}</strong></div><div className="stat"><span>Questions answered</span><strong>{totalAttempted}</strong></div><div className="stat"><span>Total correct</span><strong>{totalCorrect}</strong></div><div className="stat"><span>Overall accuracy</span><strong>{pct(totalCorrect,totalAttempted)}%</strong></div></section>
         <section className="panel"><h3>Domain performance</h3>{domainStats.length===0?<p className="empty">Take an exam to view your performance by domain.</p>:<div className="domains">{domainStats.map(d=><div key={d.name} className="domainrow"><div className="sectionhead"><strong>{d.name}</strong><span>{d.correct}/{d.total} · {pct(d.correct,d.total)}%</span></div><div className="meter"><progress aria-label={d.name+' accuracy'} value={d.correct} max={d.total}/></div></div>)}</div>}</section>
