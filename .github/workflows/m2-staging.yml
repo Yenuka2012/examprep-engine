@@ -17,6 +17,8 @@ on:
       - 'e2e-owner-pwa/**'
       - 'scripts/verify-owner-pwa-build.mjs'
       - 'scripts/verify-vault-runtime-boundary.mjs'
+      - 'scripts/verify-owner-staging-host.mjs'
+      - 'scripts/verify-owner-staging-host.test.mjs'
       - 'package.json'
       - 'vite.config.ts'
       - 'index.html'
@@ -43,6 +45,8 @@ jobs:
           package-manager-cache: false
       - name: Install locked dependencies
         run: npm ci --no-fund
+      - name: Verify owner-host audit policy (synthetic responses, NO host access)
+        run: node --test scripts/verify-owner-staging-host.test.mjs
       - name: Generate local schema validators
         run: npm run generate:validator
       - name: Build both Pages and Ubuntu static hosting targets
