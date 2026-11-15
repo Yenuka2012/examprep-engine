@@ -68,7 +68,7 @@
 .sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .app.exam-active{background:#eef2f8}
 .exam-active .main{max-width:none;padding:24px clamp(14px,2.4vw,42px);color:#15213a}
-.exam-active .top{margin-bottom:16px}
+.exam-active .top{margin-bottom:8px}
 .exam-active .top h1{color:#182743;font-size:25px}
 .exam-focus .sidebar,.exam-focus .top{display:none}
 .exam-focus .main{padding:12px clamp(10px,2vw,34px);width:100%}
@@ -76,14 +76,14 @@
   --ex-line:#d4ddeb;--ex-blue:#205bd3;--ex-choice:#f9fbff;--ex-hover:#eaf1ff;
   --ex-select:#e6efff;--ex-field:#f9fbff;--ex-tag:#e8efff;
   color:var(--ex-ink);background:var(--ex-bg);border:1px solid var(--ex-line);
-  padding:clamp(12px,1.7vw,23px);border-radius:16px;min-width:0;gap:16px}
+  padding:clamp(10px,1.2vw,16px);border-radius:16px;min-width:0;gap:11px}
 .exam-stage.theme-dark{--ex-bg:#0f1726;--ex-panel:#172437;--ex-ink:#f0f5ff;
   --ex-muted:#bdcce5;--ex-line:#394e68;--ex-blue:#a8c0ff;--ex-choice:#1c2b40;
   --ex-hover:#243954;--ex-select:#294269;--ex-field:#1e2d42;--ex-tag:#253c60}
 .exam-stage .panel,.exam-stage .examtoolbar{color:var(--ex-ink);
   background:var(--ex-panel);border:1px solid var(--ex-line);box-shadow:0 2px 12px #111c3210}
-.exam-stage .panel{padding:clamp(18px,2vw,30px)}
-.exam-stage .examtoolbar{padding:16px clamp(14px,2vw,22px);gap:16px}
+.exam-stage .panel{padding:clamp(15px,1.5vw,23px)}
+.exam-stage .examtoolbar{padding:11px clamp(13px,1.5vw,18px);gap:10px}
 .exam-title{display:grid;gap:5px;min-width:0}
 .exam-title .eyebrow{color:var(--ex-blue);font-size:11px;letter-spacing:1.1px}
 .exam-title strong{font-size:clamp(16px,1.35vw,22px);line-height:1.35;overflow-wrap:anywhere}
@@ -104,7 +104,7 @@
   outline:3px solid var(--ex-blue);outline-offset:3px}
 .exam-nav-toggle,.exam-nav-close,.exam-nav-backdrop{display:none}
 .exam-overview{display:grid;gap:11px;background:var(--ex-panel);border:1px solid var(--ex-line);
-  border-radius:12px;padding:16px 18px}
+  border-radius:12px;padding:11px 15px}
 .exam-progress-heading{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
 .exam-progress-heading strong{font-size:15px}
 .exam-progress-heading span{font-size:12px;color:var(--ex-muted)}
@@ -116,16 +116,17 @@
   gap:16px;align-items:start;min-width:0}
 .exam-stage .questionpanel{min-width:0}
 .exam-stage .questionpanel h2{color:var(--ex-ink);font-size:clamp(19px,1.75vw,25px);
-  line-height:1.55;margin:24px 0 25px;white-space:pre-wrap;overflow-wrap:anywhere}
+  line-height:1.48;margin:14px 0 18px;white-space:pre-wrap;overflow-wrap:anywhere}
 .exam-stage .pill{background:var(--ex-tag);color:var(--ex-blue);font-size:12px}
 .exam-stage .subtle{color:var(--ex-blue);min-height:44px}
 .exam-stage .choice-fieldset{border:0;padding:0;margin:0;min-width:0}
-.exam-stage .choices{gap:12px}
+.exam-stage .choices{gap:9px}
 .exam-stage .choice{color:var(--ex-ink);background:var(--ex-choice);
-  border:1px solid var(--ex-line);min-height:58px;line-height:1.5;padding:15px;align-items:center}
-.exam-stage .choice:hover{background:var(--ex-hover);border-color:var(--ex-blue)}
-.exam-stage .choice.selected{background:var(--ex-select);border:2px solid #2865e0;padding:14px}
+  border:1px solid var(--ex-line);min-height:54px;line-height:1.5;padding:12px;align-items:center;font-size:clamp(14px,1.05vw,16px)}
+.exam-stage .choice:hover:not(.selected){background:var(--ex-hover);border-color:var(--ex-line)}
+.exam-stage .choice.selected{background:var(--ex-select);border:2px solid #2865e0;padding:11px}
 .exam-stage.theme-dark .choice.selected{border-color:#b0c5ff}
+.exam-stage .choice:focus-within{outline:3px solid var(--ex-blue);outline-offset:2px}
 .exam-stage .choice input{width:18px;height:18px;flex:none;accent-color:#2563eb}
 .exam-stage .letter{background:var(--ex-tag);color:var(--ex-blue);font-size:13px;min-width:30px;min-height:30px}
 .exam-stage .exam-navigator{min-width:0}
@@ -154,7 +155,7 @@
 .exam-stage .danger{min-height:44px;width:100%;background:#9c3043;color:#fff}
 .exam-actions{position:sticky;bottom:0;z-index:5;display:flex;align-items:center;justify-content:space-between;
   gap:12px;background:var(--ex-panel);border:1px solid var(--ex-line);
-  border-radius:12px;padding:12px;box-shadow:0 -3px 22px #0c18351c}
+  border-radius:12px;padding:9px;box-shadow:0 -3px 22px #0c18351c}
 .exam-actions button{min-height:44px;min-width:120px}
 .exam-actions .secondary{background:var(--ex-field);color:var(--ex-ink);border-color:var(--ex-line)}
 .exam-actions .primary{background:#205bd3;color:white}
