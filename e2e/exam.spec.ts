@@ -55,7 +55,8 @@ test('only one tab can write an active examination and a second tab can take ove
   await page.close();
   await second.getByRole('button',{name:'Resume here'}).click();
   await expect(second.getByText(/Question 1 of/)).toBeVisible();
-  second.once('dialog',dialog=>dialog.accept());
   await second.getByRole('button',{name:'Submit exam'}).click();
+  await second.getByRole('dialog',{name:'Review before submitting'})
+    .getByRole('button',{name:'Confirm submission'}).click();
   await expect(second.getByText('EXAM COMPLETE')).toBeVisible();
 });

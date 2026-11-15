@@ -40,7 +40,9 @@ test('mobile WebKit import, responsive exam and encrypted backup export',async({
     page:document.documentElement.scrollWidth
   }));
   expect(examWidth.page).toBeLessThanOrEqual(examWidth.viewport+2);
-  page.once('dialog',dialog=>dialog.accept());
   await page.getByRole('button',{name:'Submit exam'}).click();
+  const review=page.getByRole('dialog',{name:'Review before submitting'});
+  await expect(review).toBeVisible();
+  await review.getByRole('button',{name:'Confirm submission'}).click();
   await expect(page.getByText('EXAM COMPLETE')).toBeVisible();
 });

@@ -136,7 +136,8 @@
 .exam-stage .navigator-filter select{width:100%;max-width:none;background:var(--ex-field);
   border-color:var(--ex-line);color:var(--ex-ink);min-height:44px}
 .exam-stage .numbergrid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));
-  gap:7px;margin:16px 0}
+  gap:7px;margin:16px 0;max-height:min(51vh,480px);overflow-y:auto;overscroll-behavior:contain;
+  padding:4px;align-content:start}
 .exam-stage .num{height:44px;min-width:0;width:100%;color:var(--ex-ink);
   border:1px solid var(--ex-line);background:var(--ex-field);font-weight:600}
 .exam-stage .num.answered{background:#d8f3e7;border-color:#62ad8f;color:#144f37}
@@ -206,3 +207,30 @@
 /* Keep the surrounding workspace consistent with the optional dark exam palette. */
 .app.exam-active:has(.exam-stage.theme-dark){background:#0b1020}
 .app.exam-active:has(.exam-stage.theme-dark) .top h1{color:#f0f5ff}
+
+/* UX-008: review dialog is read-only until explicit confirmation. */
+.exam-review-overlay{position:fixed;z-index:60;inset:0;display:grid;place-items:center;
+  padding:max(16px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom));overflow-y:auto}
+.exam-review-backdrop{position:fixed;inset:0;background:#071226b8}
+.exam-review-dialog{position:relative;width:min(100%,495px);max-height:calc(100dvh - 32px);
+  overflow-y:auto;background:var(--ex-panel);color:var(--ex-ink);border:1px solid var(--ex-line);
+  border-radius:16px;box-shadow:0 22px 80px #0006;padding:clamp(20px,3vw,30px)}
+.exam-review-dialog .eyebrow{color:var(--ex-blue);letter-spacing:.08em;font-size:12px}
+.exam-review-dialog h2{font-size:clamp(21px,2.5vw,27px);line-height:1.3;margin:9px 0 10px}
+.exam-review-dialog p{font-size:14px;line-height:1.6;color:var(--ex-muted)}
+.exam-review-counts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:20px 0}
+.exam-review-counts>div{padding:13px 8px;border-radius:10px;text-align:center;
+  background:var(--ex-field);border:1px solid var(--ex-line)}
+.exam-review-counts dt{font-size:12px;color:var(--ex-muted)}
+.exam-review-counts dd{margin:5px 0 0;font-weight:750;font-size:19px;color:var(--ex-ink)}
+.exam-review-dialog .exam-review-warning{padding:12px;border:1px solid #c8843b;
+  border-radius:10px;background:#fff0d8;color:#65350b;font-weight:600}
+.theme-dark .exam-review-dialog .exam-review-warning{background:#513a23;color:#ffedcf}
+.exam-review-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}
+.exam-review-actions button{min-height:44px;padding:10px 14px;flex:1}
+.exam-review-actions .secondary{background:var(--ex-field);border:1px solid var(--ex-line);color:var(--ex-ink)}
+.exam-review-actions .danger{width:auto;min-width:0}
+@media(max-width:420px){
+  .exam-review-actions{flex-direction:column-reverse}
+  .exam-review-dialog{padding:20px 15px}
+}
