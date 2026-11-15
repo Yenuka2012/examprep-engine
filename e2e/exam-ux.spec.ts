@@ -47,6 +47,10 @@ test('filtered navigation and cancelable submission summary preserve active exam
   await expect(review.getByText('1', {exact:true})).toBeVisible();
   await expect(review.getByText(/4 unanswered questions will be marked incorrect/)).toBeVisible();
   await expect(review.getByRole('button',{name:'Back to examination'})).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(review.getByRole('button',{name:'Confirm submission'})).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(review.getByRole('button',{name:'Back to examination'})).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(review).toHaveCount(0);
   await expect(page.getByRole('button',{name:'Unflag'})).toBeVisible();
