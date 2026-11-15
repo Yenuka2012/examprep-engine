@@ -100,3 +100,64 @@ and [backup/device acceptance #78 / #83](https://github.com/Yenuka2012/examprep-
 Report pass/fail, device/browser versions, deployment commit and public-policy
 metadata only. Never paste private host addresses, keys, backup files or
 question banks into a public issue.
+
+
+## Immutable static artifact evidence before copying to Ubuntu
+
+**Build-only tooling; not a production deployment or a signature.**
+The owner PWA output is public static application code, not a vault data export.
+Do not place question banks, keys, passphrases, backups or other owner files
+in the staging directory, the release evidence file or GitHub Actions.
+
+After selecting the **actual owner-controlled origin** (not the illustrative
+CI placeholder), run from a trusted source checkout:
+
+    npm ci --no-fund
+    npm run generate:validator
+    VITE_OWNER_STAGING_ORIGIN=https://YOUR-VERIFIED-HOST npm run build:owner-staging
+    npm run verify:owner-pwa
+    mkdir -p release-evidence
+    node scripts/owner-staging-artifact.mjs create dist-owner-staging release-evidence/owner-staging.real-release-manifest.json https://YOUR-VERIFIED-HOST
+    node scripts/owner-staging-artifact.mjs verify dist-owner-staging release-evidence/owner-staging.real-release-manifest.json https://YOUR-VERIFIED-HOST
+    sha256sum release-evidence/owner-staging.real-release-manifest.json
+
+The manifest contains a deterministic, lexically sorted allowlist of
+filename, exact byte length, and SHA-256 digest for every approved build
+file, plus the expected distinct HTTPS origin. It is stored **outside** the
+published \`dist-owner-staging/\` directory and must never be served over HTTP.
+
+Record the manifest digest and reviewed source SHA through a trusted
+out-of-band record. SHA-256 is an integrity *comparison* only; generating
+both code and hashes from a compromised repository or host proves nothing
+about authenticity. No code-signing mechanism or verified provenance is
+claimed here.
+
+To prepare the isolated Ubuntu staging deployment:
+
+1. Transfer the verified static build and the separate manifest over the
+   owner-approved VPN/SSH channel. Keep the manifest outside the Nginx
+   document root and do not upload it as a public application asset.
+2. On a trusted build-capable operator environment, use the same verifier
+   against the actual destination **release directory** with the same
+   expected origin. Compare the manifest SHA-256 against the independently
+   recorded digest. The verifier rejects missing/extra files, hash drift,
+   symlinks, unsafe paths and wrong HTTPS origins.
+3. Only after host and artifact verification, arrange a reviewed switch
+   to the static release directory with the previously approved Nginx
+   configuration. Preserve the prior release directory for rollback;
+   ensure an active exam has finished and the owner has safely locked the
+   vault before any application update.
+4. Run the existing HTTP/TLS host audit over the intended VPN/LAN and then
+   **physical** iPhone/iPad browser acceptance. Neither static SHA-256
+   verification nor synthetic CI proves encrypted data recovery.
+
+Example host-side verification (replace paths and host; no actual host
+access is provided by this repository):
+
+    node scripts/owner-staging-artifact.mjs verify /srv/examprep-owner-releases/REVIEWED-SHA /var/lib/examprep-release-evidence/owner-staging.real-release-manifest.json https://YOUR-VERIFIED-HOST
+    node scripts/verify-owner-staging-host.mjs https://YOUR-VERIFIED-HOST
+
+Automated synthetic CI now tests tamper rejection, safe manifest placement
+and hash reproducibility. Its generated \`owner-staging.synthetic-release-manifest.json\`
+is specifically for the placeholder \`https://exam.home.arpa\`, and **must
+not be mistaken for evidence of a provisioned real HTTPS staging host**.
