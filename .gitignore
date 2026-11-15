@@ -12,3 +12,9 @@ playwright-report/
 
 # Generated build-time CSP-safe schema validators
 src/generated/
+
+# Isolated staging and future Ubuntu artifacts: never commit build output or manifests
+dist-ubuntu/
+dist-owner-staging/
+dist-vault-test/
+owner-staging.*release-manifest.json
