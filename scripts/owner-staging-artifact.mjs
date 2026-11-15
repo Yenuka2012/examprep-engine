@@ -65,7 +65,7 @@ async function inventory(directory){
   for(const path of expectedFiles)if(!found.some(f=>f.path===path))fail('missing required file: '+path);
   if(!found.some(f=>/^assets\/.*\.js$/.test(f.path)))
     fail('missing compiled JavaScript asset');
-  found.sort((a,b)=>a.path.localeCompare(b.path,'en'));
+  found.sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0);
   return found;
 }
 
@@ -90,6 +90,8 @@ export async function createEvidence(directory,manifestPath,origin){
 
 export async function verifyEvidence(directory,manifestPath,origin){
   outside(directory,manifestPath);
+  const stat=await lstat(resolve(manifestPath));
+  if(!stat.isFile()||stat.isSymbolicLink())fail('manifest must be a regular non-symlink file');
   const source=await readFile(resolve(manifestPath));
   if(source.length>128*1024)fail('manifest too large');
   let stored;
