@@ -10,7 +10,7 @@ Base: main d5bc05faeb4441c33979782f5a625cb1b6677718. Tracking: #147; prior Stage
 
 ## Released-source change control
 - src/App.tsx approved Git blob: c0ee8cbf2649d8bf0f4f46b5fafbf2ea3741fba4
-- src/styles.css approved Git blob: 583004cbf45ac6ef4b57c7eefe4980ae4207d8c5
+- src/styles.css approved Git blob: 2b6d53d419b1451605e4b898e7c7dddd0285eb96
 - Update only these exact pins in scripts/verify-production-isolation.mjs. Keep every other frozen blob, the source allowlist and vault-marker scans unchanged.
 
 ## Acceptance gates

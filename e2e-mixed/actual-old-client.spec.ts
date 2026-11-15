@@ -196,7 +196,7 @@ test('active updated exam becomes visibly read-only after external schema change
   await oldImport(page,'ACTIVE-VERSION-GUARD','In-flight exam preservation');
   await page.getByRole('button',{name:'Practise'}).first().click();
   await page.getByRole('button',{name:'Start examination'}).click();
-  await expect(page.getByText('Exam progress saved locally.')).toBeVisible();
+  await expect(page.locator('.exam-actions-note')).toHaveText('Saved locally');
   const probe=await context.newPage();
   try{
     await probe.goto(PROBE);

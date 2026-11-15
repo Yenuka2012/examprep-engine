@@ -195,7 +195,7 @@
   .exam-stage .choice.selected{padding:11px}
   .exam-progress-heading{align-items:flex-start}
   .exam-actions{bottom:0;bottom:env(safe-area-inset-bottom);gap:8px;flex-wrap:wrap}
-  .exam-actions-note{display:none}
+  .exam-actions-note{display:flex;order:-1;flex:1 0 100%;justify-content:center;min-height:18px}
   .exam-actions button{min-width:0;flex:1 1 30%;padding:10px 8px}
   .exam-stage .exam-nav-toggle{font-size:12px}
 }
