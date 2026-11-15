@@ -68,7 +68,7 @@ const frozen={
   "src/schema.json": "03a6c56173914e4ab4d8d8cd22dfee7d9a3f1848",
   "src/storageVersionGuard.test.ts": "b4e1ab48d99812504ee92ac91912d95f4335bd12",
   "src/storageVersionGuard.ts": "523a8f222fb2ec2429d65a3ffee6e6460bf2e215",
-  "src/styles.css": "eddfc7b419fd2192b19333ff6633f3f003fdb0dd",
+  "src/styles.css": "c421b8572e8f2a7d0e063a44533a29e6f866c5b1",
   "src/types.ts": "0795739bbac673100aaea97a98ad528623f77f79",
   "src/vite-env.d.ts": "64251fba07826fb9f05570afb6d4b7d2b0cea3a2",
   "vite.config.ts": "da9af2e40079b99f858367df6a946c99385ce3ef"

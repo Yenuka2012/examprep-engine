@@ -28,6 +28,8 @@ test('mobile WebKit import, responsive exam and encrypted backup export',async({
   await page.getByRole('button',{name:'Practise'}).first().click();
   await page.getByRole('button',{name:'Start examination'}).click();
   await expect(page.getByText('Which choice is best for offline private data?')).toBeVisible();
+  await expect(page.locator('.exam-actions-note')).toBeVisible();
+  await expect(page.locator('.exam-actions-note')).toHaveText('Saved locally');
   await page.getByRole('radio').first().check();
   await expect(page.getByRole('button',{name:'Questions'})).toBeVisible();
   await page.getByRole('button',{name:'Questions'}).click();

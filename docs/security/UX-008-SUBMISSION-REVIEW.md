@@ -10,7 +10,7 @@ Base PR: #149 at 2d7e1b506c9514d38ba6fc6a6a7110a7ca2b7c31; tracking #148; see ov
 
 ## Exact approved application UI pins
 - src/App.tsx: 4cd044ac6281d131e79b394173f24d5d5ede7cfa
-- src/styles.css: eddfc7b419fd2192b19333ff6633f3f003fdb0dd
+- src/styles.css: c421b8572e8f2a7d0e063a44533a29e6f866c5b1
 Only those existing pins are updated in the production source freeze; all other pins and forbidden production asset/vault marker checks stay intact.
 
 ## Required validation
