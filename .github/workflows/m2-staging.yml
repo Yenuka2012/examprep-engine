@@ -19,6 +19,8 @@ on:
       - 'scripts/verify-vault-runtime-boundary.mjs'
       - 'scripts/verify-owner-staging-host.mjs'
       - 'scripts/verify-owner-staging-host.test.mjs'
+      - 'scripts/owner-staging-artifact.mjs'
+      - 'scripts/owner-staging-artifact.test.mjs'
       - 'package.json'
       - 'vite.config.ts'
       - 'index.html'
@@ -47,6 +49,8 @@ jobs:
         run: npm ci --no-fund
       - name: Verify owner-host audit policy (synthetic responses, NO host access)
         run: node --test scripts/verify-owner-staging-host.test.mjs
+      - name: Verify deterministic artifact hashing and tamper rejection
+        run: node --test scripts/owner-staging-artifact.test.mjs
       - name: Generate local schema validators
         run: npm run generate:validator
       - name: Build both Pages and Ubuntu static hosting targets
@@ -62,6 +66,10 @@ jobs:
         run: npm run build:owner-staging
       - name: Check static-only owner PWA artifact and precache boundary
         run: npm run verify:owner-pwa
+      - name: Generate and verify synthetic owner PWA artifact evidence
+        run: |
+          node scripts/owner-staging-artifact.mjs create dist-owner-staging owner-staging.synthetic-release-manifest.json https://exam.home.arpa
+          node scripts/owner-staging-artifact.mjs verify dist-owner-staging owner-staging.synthetic-release-manifest.json https://exam.home.arpa
       - name: Browser regression for owner PWA shell (synthetic localhost)
         run: npm run test:e2e:owner-pwa
       - name: Retain failure diagnostics
