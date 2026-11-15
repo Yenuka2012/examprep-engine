@@ -18,7 +18,7 @@ import { decodeBackup, restoreBackup, requestPersistentStorage } from './recover
 import type { Attempt, ExamSession, QuestionBank, CertificationProfile } from './types';
 import BackupSafetyGuide from './BackupSafetyGuide';
 import {filterQuestionBanks,filterAttemptHistory,weakestDomains,attemptReview,type ScoreBand} from './learningInsights';
-import {EXAM_PRESETS,examOverview,navigatorItems,examTimeNotice,submissionReview,type NavigatorFilter} from './examUx';
+import {EXAM_PRESETS,examOverview,navigatorItems,examTimeNotice,type NavigatorFilter} from './examUx';
 
 type Page = 'dashboard' | 'banks' | 'catalog' | 'exam' | 'analytics';
 const SESSION_KEY = 'examprep-active-session-v1';
@@ -57,6 +57,10 @@ export default function App() {
   const [examTheme,setExamTheme]=useState<'light'|'dark'>('light');
   const [examFocus,setExamFocus]=useState(false);
   const [navigatorOpen,setNavigatorOpen]=useState(false);
+  // Submission review is presentation-only. Durable completion still goes through completeExam().
+  const [submitReviewOpen,setSubmitReviewOpen]=useState(false);
+  const reviewDialogRef=useRef<HTMLDivElement|null>(null);
+  const reviewTriggerRef=useRef<HTMLButtonElement|null>(null);
   const questionHeadingRef=useRef<HTMLHeadingElement|null>(null);
   const [domain,setDomain]=useState('ALL');
   const [error,setError]=useState('');
@@ -422,6 +426,42 @@ export default function App() {
     document.addEventListener('keydown',onKey);
     return()=>document.removeEventListener('keydown',onKey);
   },[navigatorOpen]);
+  // The review dialog does not modify answers, timer, lock or persisted exam state.
+  function openSubmissionReview(source:HTMLButtonElement){
+    reviewTriggerRef.current=source;
+    setNavigatorOpen(false);
+    setSubmitReviewOpen(true);
+  }
+  function closeSubmissionReview(){
+    setSubmitReviewOpen(false);
+    window.requestAnimationFrame(()=>{
+      const source=reviewTriggerRef.current;
+      if(source?.getClientRects().length)source.focus();
+      else document.querySelector<HTMLButtonElement>('.exam-submit-small')?.focus();
+    });
+  }
+  useEffect(()=>{
+    if(!isActiveExam)setSubmitReviewOpen(false);
+  },[isActiveExam]);
+  useEffect(()=>{
+    if(!submitReviewOpen)return;
+    const dialog=reviewDialogRef.current;
+    const controls=()=>Array.from(dialog?.querySelectorAll<HTMLButtonElement>('button:not([disabled])')??[]);
+    controls()[0]?.focus();
+    const onKey=(event:KeyboardEvent)=>{
+      if(event.key==='Escape'){
+        event.preventDefault();closeSubmissionReview();return;
+      }
+      if(event.key!=='Tab')return;
+      const items=controls();
+      if(!items.length)return;
+      const first=items[0],last=items[items.length-1];
+      if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
+      else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+    };
+    document.addEventListener('keydown',onKey);
+    return()=>document.removeEventListener('keydown',onKey);
+  },[submitReviewOpen]);
   return <div className={'app'+(isActiveExam?' exam-active':'')+(isActiveExam&&examFocus?' exam-focus':'')}>
     <aside className="sidebar">
       <div className="brand"><BookOpen size={26}/><div><strong>ExamPrep</strong><span>PERSONAL ENGINE</span></div></div>
@@ -649,7 +689,7 @@ export default function App() {
                 <span><i className="legend-swatch flagged"/>Flagged</span>
               </div>
               <div className="examend"><button type="button" className="danger"
-                onClick={()=>{if(window.confirm(submissionReview(session)))completeExam(session);}}>Submit exam</button></div>
+                onClick={event=>openSubmissionReview(event.currentTarget)}>Submit exam</button></div>
             </aside>
           </div>
           <nav className="exam-actions" aria-label="Question actions">
@@ -657,10 +697,34 @@ export default function App() {
               onClick={()=>move(session.index-1)}>← Previous</button>
             <span className="exam-actions-note" role="status" aria-live="polite">{saveStatus==='saved'?'Saved locally':saveStatus==='saving'?'Saving progress…':'Save failed — retry above'}</span>
             <button type="button" className="danger exam-submit-small"
-              onClick={()=>{if(window.confirm(submissionReview(session)))completeExam(session);}}>Submit exam</button>
+              onClick={event=>openSubmissionReview(event.currentTarget)}>Submit exam</button>
             <button type="button" className="primary" disabled={session.index===session.questions.length-1}
               onClick={()=>move(session.index+1)}>Next →</button>
           </nav>
+          {submitReviewOpen&&<div className="exam-review-overlay">
+            <div className="exam-review-backdrop" aria-hidden="true"/>
+            <div className="exam-review-dialog" role="dialog" aria-modal="true"
+              aria-labelledby="exam-submit-review-title" aria-describedby="exam-submit-review-description"
+              ref={reviewDialogRef}>
+              <span className="eyebrow">FINAL CHECK</span>
+              <h2 id="exam-submit-review-title">Review before submitting</h2>
+              <p id="exam-submit-review-description">Review your progress. Your answers will not be changed unless you confirm submission.</p>
+              <dl className="exam-review-counts">
+                <div><dt>Answered</dt><dd>{overview.answered} / {overview.total}</dd></div>
+                <div><dt>Unanswered</dt><dd>{overview.unanswered}</dd></div>
+                <div><dt>Flagged</dt><dd>{overview.flagged}</dd></div>
+              </dl>
+              {overview.unanswered>0&&<p role="alert" className="exam-review-warning">
+                {overview.unanswered} unanswered {overview.unanswered===1?'question will':'questions will'} be marked incorrect.
+              </p>}
+              <p className="exam-review-note">Submission is final. Existing save and ownership protections remain active.</p>
+              <div className="exam-review-actions">
+                <button type="button" className="secondary" onClick={closeSubmissionReview}>Back to examination</button>
+                <button type="button" className="danger" disabled={timeLeft<=0}
+                  onClick={()=>{setSubmitReviewOpen(false);completeExam(session);}}>Confirm submission</button>
+              </div>
+            </div>
+          </div>}
         </div>;})()}
       {page==='analytics'&&<div className="stack">
         <section className="stats"><div className="stat"><span>Completed exams</span><strong>{attempts.length}</strong></div><div className="stat"><span>Questions answered</span><strong>{totalAttempted}</strong></div><div className="stat"><span>Total correct</span><strong>{totalCorrect}</strong></div><div className="stat"><span>Overall accuracy</span><strong>{pct(totalCorrect,totalAttempted)}%</strong></div></section>

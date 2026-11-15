@@ -40,8 +40,10 @@ test('Stage A theme, focus and navigation preserve examination answers',async({p
   await expect(page.locator('.sidebar')).toBeVisible();
   await page.getByRole('button',{name:'Use light exam theme'}).click();
   await expect(page.locator('.exam-stage')).toHaveClass(/theme-light/);
-  page.once('dialog',dialog=>dialog.dismiss());
   await page.getByRole('button',{name:'Submit exam'}).click();
+  const review=page.getByRole('dialog',{name:'Review before submitting'});
+  await expect(review).toBeVisible();
+  await review.getByRole('button',{name:'Back to examination'}).click();
   await expect(page.locator('#exam-question-heading')).toBeVisible();
 });
 

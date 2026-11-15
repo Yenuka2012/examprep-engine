@@ -20,7 +20,7 @@ const frozen={
   "index.html": "41c5c0a69408f61c95ffe88cdd404762ce750185",
   "public/favicon.svg": "778ad69298b6b89045dc8b0a924f85c27bf1c48d",
   "scripts/generate-validator.mjs": "afac5049c68a8a28f07679bc1e9f1a4655da6633",
-  "src/App.tsx": "c0ee8cbf2649d8bf0f4f46b5fafbf2ea3741fba4",
+  "src/App.tsx": "4cd044ac6281d131e79b394173f24d5d5ede7cfa",
   "src/CatalogPanel.tsx": "78a207001d19908c32df5aecb32400707cd190c3",
   "src/CutoverReadinessPanel.tsx": "78a4666a45371a0c5af5ff6ebc44909d1ad69c9b",
   "src/PwaStatus.tsx": "dcb531a4b3e2965b46a019628c4b187f7d92f5e0",
@@ -68,7 +68,7 @@ const frozen={
   "src/schema.json": "03a6c56173914e4ab4d8d8cd22dfee7d9a3f1848",
   "src/storageVersionGuard.test.ts": "b4e1ab48d99812504ee92ac91912d95f4335bd12",
   "src/storageVersionGuard.ts": "523a8f222fb2ec2429d65a3ffee6e6460bf2e215",
-  "src/styles.css": "2b6d53d419b1451605e4b898e7c7dddd0285eb96",
+  "src/styles.css": "c421b8572e8f2a7d0e063a44533a29e6f866c5b1",
   "src/types.ts": "0795739bbac673100aaea97a98ad528623f77f79",
   "src/vite-env.d.ts": "64251fba07826fb9f05570afb6d4b7d2b0cea3a2",
   "vite.config.ts": "da9af2e40079b99f858367df6a946c99385ce3ef"
