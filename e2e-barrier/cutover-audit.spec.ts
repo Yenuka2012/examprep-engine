@@ -53,7 +53,7 @@ test('unfinished exam blocks read-only audit when another tab holds exam owner l
   await expect(page.getByText('Cybersecurity Fundamentals Demo').first()).toBeVisible();
   await page.getByRole('button',{name:'Practise'}).first().click();
   await page.getByRole('button',{name:'Start examination'}).click();
-  await expect(page.getByText('Exam progress saved locally.')).toBeVisible();
+  await expect(page.locator('.exam-actions-note')).toHaveText('Saved locally');
   const other=await context.newPage();
   try{
     await other.goto(home);

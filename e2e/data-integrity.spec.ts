@@ -10,7 +10,7 @@ test('failed IndexedDB autosave blocks completion and preserves the visible sess
   await expect(start).toBeEnabled();
   await start.click();
   await expect(page.getByText(/Question 1 of/)).toBeVisible();
-  await expect(page.getByText('Exam progress saved locally.')).toBeVisible();
+  await expect(page.locator('.exam-actions-note')).toHaveText('Saved locally');
 
   // Simulate a browser storage failure during an active exam. The application
   // must fail closed, not submit from React memory after its durable record vanishes.

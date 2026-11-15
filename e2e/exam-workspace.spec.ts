@@ -9,7 +9,13 @@ test('Stage A theme, focus and navigation preserve examination answers',async({p
   await page.getByRole('button',{name:'Start examination'}).click();
 
   await expect(page.locator('.exam-stage')).toHaveClass(/theme-light/);
-  await expect(page.getByText('Exam progress saved locally.')).toBeVisible();
+  // A quiet success indicator replaces the duplicated green save banner.
+  await expect(page.getByText('Exam progress saved locally.')).toHaveCount(0);
+  await expect(page.locator('.exam-actions-note')).toHaveText('Saved locally');
+  await expect(page.locator('.sidebar .sidefoot')).toContainText('v0.3.2');
+  await expect(page.getByText(/Imported 5 questions into/)).toHaveCount(0);
+  await page.locator('.questionpanel .choice').first().hover();
+  await expect(page.locator('.questionpanel .choice.selected')).toHaveCount(0);
   await page.locator('.questionpanel input').first().check();
   await expect(page.locator('.questionpanel .choice.selected')).toHaveCount(1);
   await expect(page.locator('.questionpanel')).not.toContainText('Correct Answer:');

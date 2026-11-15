@@ -430,13 +430,13 @@ export default function App() {
           <button key={id} onClick={()=>{setPage(id);setError('');}} className={'navbtn '+(page===id?'active':'')}><Icon size={18}/>{label}</button>
         )}
       </div>
-      <div className="sidefoot"><ShieldCheck size={16}/> Local-first · v0.3.0<br/><small>No cloud sync. Backup regularly.</small></div>
+      <div className="sidefoot"><ShieldCheck size={16}/> Local-first · v0.3.2<br/><small>No cloud sync. Backup regularly.</small></div>
     </aside>
     <main className="main">
       <header className="top"><div><p className="eyebrow">EXAM PREPARATION WORKSPACE</p><h1>{page==='banks'?'Question Banks':page==='catalog'?'Certifications & Syllabi':page==='exam'?'Exam Simulator':page==='analytics'?'Learning Analytics':'Overview'}</h1></div><span className="tag">Browser-local storage</span></header>
       <PwaStatus/><StorageCompatibilityStatus/>
       {error&&<div role="alert" className="alert bad"><strong>Action required</strong><pre>{error}</pre><button onClick={()=>setError('')}>Dismiss</button></div>}
-      {notice&&<div role="status" className="alert good">{notice}<button onClick={()=>setNotice('')}>Dismiss</button></div>}
+      {notice&&!isActiveExam&&<div role="status" className="alert good">{notice}<button onClick={()=>setNotice('')}>Dismiss</button></div>}
       {session&&page!=='exam'&&<div className="alert warn">{examAccess==='owner'?'You have an examination in progress.':'An examination is saved but this tab is not its active owner.'} <button onClick={()=>setPage('exam')}>View exam status</button></div>}
       {page==='dashboard'&&<div className="stack">
         <section className="hero"><div><span className="hero-kicker">READY WHEN YOU ARE</span><h2>Build confidence, one question at a time.</h2><p>Import your own JSON question banks, practise under exam conditions and follow your progress. All questions and results stay in this browser.</p><button className="primary" onClick={()=>setPage('banks')}>Manage question banks →</button></div><div className="hero-art"><BookOpen size={84}/></div></section>
@@ -560,10 +560,10 @@ export default function App() {
         const timeNotice=examTimeNotice(timeLeft);
         const marked=session.marked.includes(q.id);
         return <div className={'stack exam-stage theme-'+examTheme}>
-          <section role="status" aria-live="polite" className={'alert exam-save-status '+(saveStatus==='failed'?'warn':'')}>
-            {saveStatus==='saved'?'Exam progress saved locally.':saveStatus==='saving'?'Saving exam progress…':'Autosave failed. Latest changes may be unsaved.'}
+          {saveStatus!=='saved'&&<section role="status" aria-live="polite" className={'alert exam-save-status '+(saveStatus==='failed'?'warn':'')}>
+            {saveStatus==='saving'?'Saving exam progress…':'Autosave failed. Latest changes may be unsaved.'}
             {saveStatus==='failed'&&<button type="button" onClick={retrySave}>Retry save</button>}
-          </section>
+          </section>}
           <section className="examtoolbar" aria-label="Active examination">
             <div className="exam-title">
               <span className="eyebrow">EXAM SIMULATION · {session.bank.certification}</span>
@@ -655,7 +655,7 @@ export default function App() {
           <nav className="exam-actions" aria-label="Question actions">
             <button type="button" className="secondary" disabled={session.index===0}
               onClick={()=>move(session.index-1)}>← Previous</button>
-            <span className="exam-actions-note">{saveStatus==='saved'?'Saved locally':saveStatus==='saving'?'Saving progress…':'Save failed — retry above'}</span>
+            <span className="exam-actions-note" role="status" aria-live="polite">{saveStatus==='saved'?'Saved locally':saveStatus==='saving'?'Saving progress…':'Save failed — retry above'}</span>
             <button type="button" className="danger exam-submit-small"
               onClick={()=>{if(window.confirm(submissionReview(session)))completeExam(session);}}>Submit exam</button>
             <button type="button" className="primary" disabled={session.index===session.questions.length-1}
