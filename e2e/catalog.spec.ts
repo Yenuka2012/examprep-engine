@@ -129,7 +129,7 @@ test('M1.1 v2 active exam and answers survive the additive IndexedDB v3 migratio
   await page.goto('/examprep-engine/');
   await expect(page.getByText('Question 2 of 2')).toBeVisible();
   await expect(page.getByRole('button',{name:'Unflag'})).toBeVisible();
-  await expect(page.getByText('Exam progress saved locally.')).toBeVisible();
+  await expect(page.locator('.exam-actions-note')).toHaveText('Saved locally');
   await expect(page.getByText(/1 answered/)).toBeVisible();
   const version=await page.evaluate(async()=>new Promise<number>((resolve,reject)=>{
     const request=indexedDB.open('examprep-v1');
