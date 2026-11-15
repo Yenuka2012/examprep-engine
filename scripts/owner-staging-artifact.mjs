@@ -7,7 +7,8 @@
  * it does not authenticate the author, source commit, network or host.
  */
 import {createHash} from 'node:crypto';
-import {readFile,readdir,lstat,writeFile} from 'node:fs/promises';
+import {open as openFile,readdir,lstat,writeFile} from 'node:fs/promises';
+import {constants} from 'node:fs';
 import {resolve,join,relative,sep,posix} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import assert from 'node:assert/strict';
@@ -50,11 +51,20 @@ async function inventory(directory){
       if(!expectedFiles.has(next)&&!assetPattern.test(next))
         fail('unapproved output file: '+next);
       const full=join(root,...next.split('/'));
-      const stat=await lstat(full);
-      if(!stat.isFile()||stat.isSymbolicLink()||stat.size>maxFileSize)
-        fail('invalid or oversized output file: '+next);
-      const bytes=await readFile(full);
-      if(bytes.length!==stat.size)fail('file changed during hashing: '+next);
+      // Open once without following the final symlink. Hash and stat the SAME
+      // file descriptor; never stat a path and then read a replaceable path.
+      const file=await openFile(full,constants.O_RDONLY|constants.O_NOFOLLOW);
+      let bytes;
+      try{
+        const before=await file.stat();
+        if(!before.isFile()||before.size>maxFileSize)
+          fail('invalid or oversized output file: '+next);
+        bytes=await file.readFile();
+        const after=await file.stat();
+        if(bytes.length!==before.size||after.size!==before.size||
+          after.mtimeMs!==before.mtimeMs||after.ctimeMs!==before.ctimeMs)
+          fail('file changed during hashing: '+next);
+      }finally{await file.close();}
       total+=bytes.length;
       if(total>maxTotalSize)fail('total artifact exceeds 25 MiB');
       found.push({path:next,bytes:bytes.length,sha256:sha256(bytes)});
@@ -90,10 +100,17 @@ export async function createEvidence(directory,manifestPath,origin){
 
 export async function verifyEvidence(directory,manifestPath,origin){
   outside(directory,manifestPath);
-  const stat=await lstat(resolve(manifestPath));
-  if(!stat.isFile()||stat.isSymbolicLink())fail('manifest must be a regular non-symlink file');
-  const source=await readFile(resolve(manifestPath));
-  if(source.length>128*1024)fail('manifest too large');
+  const file=await openFile(resolve(manifestPath),constants.O_RDONLY|constants.O_NOFOLLOW);
+  let source;
+  try{
+    const stat=await file.stat();
+    if(!stat.isFile()||stat.size>128*1024)fail('manifest must be a small regular file');
+    source=await file.readFile();
+    const after=await file.stat();
+    if(source.length!==stat.size||after.size!==stat.size||
+      after.mtimeMs!==stat.mtimeMs||after.ctimeMs!==stat.ctimeMs)
+      fail('manifest changed during verification');
+  }finally{await file.close();}
   let stored;
   try{stored=JSON.parse(source.toString('utf8'));}catch{fail('invalid manifest JSON');}
   const expected=await buildEvidence(directory,origin);
