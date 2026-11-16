@@ -87,6 +87,10 @@ test('encrypted owner starts a 150-question four-domain CISM full mock from four
   await expect(page.getByText(/exact question bank was already imported/)).toBeVisible();
   await expect(page.getByText('5 encrypted bank(s)')).toBeVisible();
   await page.getByRole('button',{name:'Exam Practice'}).click();
+  // Accessible names must not overlap: older domain-practice tests use
+  // getByLabel('Practice question count') without exact=true.
+  await expect(page.getByLabel('Practice question count')).toHaveCount(1);
+  await expect(page.getByLabel('Collection question count')).toHaveCount(1);
   await page.getByLabel('Merged practice syllabus').selectOption('CISM/2026');
   await page.getByLabel('Merged practice domain').selectOption('D1');
   await expect(page.getByText('75 unique question(s) available from source JSON batches.')).toBeVisible();

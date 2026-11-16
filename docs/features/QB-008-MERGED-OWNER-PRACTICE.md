@@ -9,3 +9,9 @@
 - Important known tradeoff: each attempt stores a derived immutable practice bank. Future native multi-source manifest support could avoid repeated storage usage, but requires separately reviewed format migration. Do not weaken 8 MiB record or 64 MiB backup limits.
 
 Acceptance: old-source and vault safety tests, 10-item merged domain test from synthetic multiple-source inputs, 150-item full mock regression, no source IDB access or plaintext fallback.
+
+## Regression remediation (2026-11-16)
+
+- Kept the original `Practice question count` accessible label unique; the merged source selector now uses `Collection question count` so existing Playwright and assistive-technology lookups are unambiguous.
+- Exact duplicate reimport is intentionally idempotent (no new ciphertext record); changed content under the same bank_id must still fail closed with no overwrite. Updated encrypted owner E2E expectations cover both cases.
+- Retest all Chromium, WebKit, emulated iPhone and iPad, and the M2 cryptographic owner source-barrier suites on this exact head. Until green, PR #155 remains draft and excluded from release.
