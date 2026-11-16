@@ -48,3 +48,10 @@ html.encrypted-owner-redacting #encrypted-owner{visibility:hidden!important}
 .encrypted-owner .owner-syllabus-domain textarea:focus-visible{outline:3px solid #94f2df;outline-offset:2px}
 .encrypted-owner .owner-syllabus-domain label{max-width:680px}
 .encrypted-owner .owner-syllabus-domain legend{font-weight:650}
+
+/* EX-006: owner-only full mock readiness, no overlay or source client changes. */
+.owner-mock-setup{margin:22px 0 8px;padding:16px;border:1px solid #64748b;border-radius:12px}
+.owner-mock-setup legend{font-weight:700;padding:0 8px}
+.owner-mock-setup li{margin:6px 0;line-height:1.5}
+.owner-mock-setup button{min-height:44px}
+@media(max-width:600px){.owner-mock-setup{padding:12px;margin-top:16px}}
