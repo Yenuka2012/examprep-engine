@@ -90,7 +90,7 @@ test('encrypted owner starts a 150-question four-domain CISM full mock from four
   await page.getByLabel('Merged practice syllabus').selectOption('CISM/2026');
   await page.getByLabel('Merged practice domain').selectOption('D1');
   await expect(page.getByText('75 unique question(s) available from source JSON batches.')).toBeVisible();
-  await page.getByLabel('Merged practice question count').fill('10');
+  await page.getByLabel('Collection question count').fill('10');
   await page.getByRole('button',{name:'Start merged domain practice'}).click();
   await expect(page.locator('.owner-navigator button')).toHaveCount(10);
   page.once('dialog',dialog=>dialog.accept());

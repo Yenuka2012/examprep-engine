@@ -703,7 +703,7 @@ export default function EncryptedOwnerApp({PwaStatus}:{
             <p role="status">{collectionAvailable} unique question(s) available from source JSON batches.</p>
             {collectionIssue&&<p role="alert">{collectionIssue}</p>}
             <label>Questions <input type="number" min={1} max={Math.max(1,collectionAvailable)}
-              aria-label="Merged practice question count" value={collectionQuestions}
+              aria-label="Collection question count" value={collectionQuestions}
               onChange={e=>setCollectionQuestions(Number(e.target.value))}/></label>
             <label>Duration (minutes) <input type="number" min={1} max={300}
               aria-label="Merged practice minutes" value={collectionMinutes}
