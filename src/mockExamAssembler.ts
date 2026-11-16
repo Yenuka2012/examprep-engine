@@ -30,7 +30,7 @@ export function allocateDomainQuotas(blueprint:ExamBlueprint):DomainQuota[]{
   }
   const raw=items.map(d=>blueprint.questionCount*d.weight/100);
   const counts=raw.map(n=>Math.floor(n));
-  const ranked=items.map((d,i)=>i).sort((a,b)=>
+  const ranked=items.map((_domain,i)=>i).sort((a,b)=>
     (raw[b]-counts[b])-(raw[a]-counts[a])||
     items[b].weight-items[a].weight||
     items[a].code.localeCompare(items[b].code));

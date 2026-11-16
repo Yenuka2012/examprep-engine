@@ -26,7 +26,7 @@ export const EXAM_BLUEPRINTS:readonly ExamBlueprint[]=[
   },
   {
     id:'ISACA-CRISC-2025-v1',provider:'ISACA',certificationId:'CRISC',
-    syllabusVersion:'2025',effectiveFrom:'2025-08-01',verifiedDate:'2026-11-16',
+    syllabusVersion:'2025',effectiveFrom:'2025-11-03',verifiedDate:'2026-11-16',
     officialOutlineUrl:'https://www.isaca.org/credentialing/crisc/crisc-exam-content-outline',
     questionCount:150,durationMinutes:240,itemType:'four_option_single_best',
     domains:[
