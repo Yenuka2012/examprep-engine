@@ -58,10 +58,28 @@ test('encrypted owner starts a 150-question four-domain CISM full mock from four
     });
     await expect(page.getByText(new RegExp('encrypted bank\\(s\\) stored'))).toBeVisible();
   }
+  // An additional D1 JSON batch contributes to the SAME canonical domain
+  // without rewriting the first D1 bank or altering another domain.
+  const supplemental=Array.from({length:20},(_,i)=>({
+    id:'SUPP-D1-Q'+String(i+1).padStart(3,'0'),
+    type:'single_choice',domain:'D1',
+    question:'Additional synthetic D1 workplace decision '+(i+1)+'?',
+    options:['A','B','C','D'].map(letter=>({id:letter,text:'Supplemental '+letter+' choice '+i})),
+    correct_answers:['B'],explanation:'Second batch synthetic rationale'
+  }));
+  await page.getByLabel('Import question bank').setInputFiles({
+    name:'D1-supplemental.json',mimeType:'application/json',
+    buffer:Buffer.from(JSON.stringify({
+      schema_version:'1.0',bank_id:'CISM-D1-SUPPLEMENTAL',
+      title:'Second D1 Synthetic Batch',certification:'CISM',
+      syllabus_version:'2026',questions:supplemental
+    }))
+  });
+  await expect(page.getByText('5 encrypted bank(s)')).toBeVisible();
   await page.getByRole('button',{name:'Exam Practice'}).click();
   await page.getByLabel('Merged practice syllabus').selectOption('CISM/2026');
   await page.getByLabel('Merged practice domain').selectOption('D1');
-  await expect(page.getByText('55 unique question(s) available from source JSON batches.')).toBeVisible();
+  await expect(page.getByText('75 unique question(s) available from source JSON batches.')).toBeVisible();
   await page.getByLabel('Merged practice question count').fill('10');
   await page.getByRole('button',{name:'Start merged domain practice'}).click();
   await expect(page.locator('.owner-navigator button')).toHaveCount(10);
@@ -72,7 +90,7 @@ test('encrypted owner starts a 150-question four-domain CISM full mock from four
   await page.getByRole('button',{name:'Exam Practice'}).click();
   await page.getByLabel('Full mock blueprint').selectOption('ISACA-CISM-2026-11-03-v1');
   const readiness=page.getByLabel('Full mock readiness');
-  await expect(readiness).toContainText('D1 — Information Security Governance: required 27, available 55');
+  await expect(readiness).toContainText('D1 — Information Security Governance: required 27, available 75');
   await expect(readiness).toContainText('D2 — Information Security Risk Management: required 30, available 55');
   await expect(readiness).toContainText('D3 — Information Security Program: required 50, available 55');
   await expect(readiness).toContainText('D4 — Incident Management: required 43, available 55');
