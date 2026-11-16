@@ -10,7 +10,7 @@ test('failed IndexedDB autosave blocks completion and preserves the visible sess
   await expect(start).toBeEnabled();
   await start.click();
   await expect(page.getByText(/Question 1 of/)).toBeVisible();
-  await expect(page.getByText('Exam progress saved locally.')).toBeVisible();
+  await expect(page.locator('.exam-actions-note')).toHaveText('Saved locally');
 
   // Simulate a browser storage failure during an active exam. The application
   // must fail closed, not submit from React memory after its durable record vanishes.
@@ -32,8 +32,9 @@ test('failed IndexedDB autosave blocks completion and preserves the visible sess
   await page.getByRole('button',{name:'Flag'}).click();
   await expect(page.getByText('Autosave failed. Latest changes may be unsaved.')).toBeVisible();
   await expect(page.getByRole('button',{name:'Retry save'})).toBeVisible();
-  page.once('dialog',dialog=>dialog.accept());
   await page.getByRole('button',{name:'Submit exam'}).click();
+  await page.getByRole('dialog',{name:'Review before submitting'})
+    .getByRole('button',{name:'Confirm submission'}).click();
   await expect(page.getByRole('alert').getByText(/Exam submission was not saved/)).toBeVisible();
   await expect(page.getByText(/Question 1 of/)).toBeVisible();
   await expect(page.getByText('EXAM COMPLETE')).toHaveCount(0);
