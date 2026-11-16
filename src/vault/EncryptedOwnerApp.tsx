@@ -14,6 +14,8 @@ import {EncryptedExamRuntime,type ActiveExamRevision} from './encryptedExamRunti
 import {filterQuestionBanks,filterAttemptHistory,attemptReview,weakestDomains,type ScoreBand} from '../learningInsights';
 import {selectSecurePracticeQuestions,domainMetricsFromAttempts,studySummary} from './studyParity';
 import {EXAM_PRESETS,examOverview,examTimeNotice,navigatorItems,submissionReview,type NavigatorFilter} from '../examUx';
+import {EXAM_BLUEPRINTS} from '../examBlueprints';
+import {checkFullMockReadiness,compileFullMock} from '../mockExamAssembler';
 import {MAX_VAULT_TRANSFER_BYTES} from './transfer';
 import {restoreValidatedConvertedDestinationIntoEmpty} from './validatedConvertedRestore';
 import OriginTopologyPanel from './OriginTopologyPanel';
@@ -65,6 +67,7 @@ export default function EncryptedOwnerApp({PwaStatus}:{
   const [bankCertFilter,setBankCertFilter]=useState('ALL');
   const [bankDomainFilter,setBankDomainFilter]=useState('ALL');
   const [examDomain,setExamDomain]=useState('ALL');
+  const [mockBlueprintId,setMockBlueprintId]=useState<string>(EXAM_BLUEPRINTS[0].id);
   const [certId,setCertId]=useState('');
   const [certName,setCertName]=useState('');
   const [certProvider,setCertProvider]=useState('');
@@ -371,6 +374,49 @@ export default function EncryptedOwnerApp({PwaStatus}:{
     }catch(e){setError(fail(e));}
     finally{setBusy(false);}
   }
+  async function startFullMock(){
+    if(busy||exam||phase!=='unlocked')return;
+    const blueprint=EXAM_BLUEPRINTS.find(item=>item.id===mockBlueprintId);
+    if(!blueprint){setError('Choose a supported full mock blueprint.');return;}
+    const syllabus=syllabi.find(item=>item.id===blueprint.certificationId+'/'+
+      blueprint.syllabusVersion&&item.status==='published');
+    if(!syllabus){setError('Publish the matching certification syllabus before starting a full mock.');return;}
+    setBusy(true);setError('');
+    const g=generation.current;
+    try{
+      const result=compileFullMock(blueprint,banks,syllabus);
+      // Existing M2.8 exam validation embeds the complete bank AND question
+      // snapshots. Reject oversized sessions before writing any ciphertext.
+      const startedAt=new Date().toISOString();
+      const session:ExamSession={
+        id:crypto.randomUUID(),bank:copy(result.bank),
+        questions:copy(result.bank.questions),answers:{},marked:[],index:0,
+        startedAt,endsAt:Date.parse(startedAt)+blueprint.durationMinutes*60_000,
+        durationSeconds:blueprint.durationMinutes*60
+      };
+      const sessionBytes=new TextEncoder().encode(JSON.stringify(session)).byteLength;
+      if(sessionBytes>6*1024*1024){
+        throw new Error('Full mock session exceeds the safe encrypted record capacity. Reduce content size or review storage limits.');
+      }
+      const rt=ctx();
+      // Never bypass M2.8's authenticated bank/session equality check.
+      // Create an immutable derived, encrypted bank BEFORE the exam slot.
+      await rt.addBank(result.bank);
+      if(g!==generation.current)throw new Error('Owner vault locked during mock setup.');
+      const active=await rt.startExam(session);
+      if(g!==generation.current)return;
+      committed.current=active;draft.current=active;
+      setExam(active);setNow(Date.now());setView('exam');setResult(null);
+      setSaveState('saved');
+      setMessage('Full practice mock started from authenticated encrypted question snapshots.');
+      await refresh();
+    }catch(e){
+      if(g===generation.current){
+        setError('Full mock not started: '+fail(e)+
+          ' Any successfully encrypted derived bank was preserved; no existing question bank was overwritten.');
+      }
+    }finally{if(g===generation.current)setBusy(false);}
+  }
   function editSession(change:(s:ExamSession)=>ExamSession){
     if(!draft.current||busy)return;
     const owner=binding.current?.owner;
@@ -406,6 +452,16 @@ export default function EncryptedOwnerApp({PwaStatus}:{
     finally{if(g===generation.current)setBusy(false);submitting.current=false;}
   }
 
+  const mockBlueprint=EXAM_BLUEPRINTS.find(item=>item.id===mockBlueprintId);
+  const mockSyllabus=mockBlueprint?syllabi.find(item=>
+    item.id===mockBlueprint.certificationId+'/'+mockBlueprint.syllabusVersion&&
+    item.status==='published'):undefined;
+  let fullMockStatus:ReturnType<typeof checkFullMockReadiness>|undefined;
+  let fullMockError='';
+  if(mockBlueprint&&mockSyllabus){
+    try{fullMockStatus=checkFullMockReadiness(mockBlueprint,banks,mockSyllabus);}
+    catch(e){fullMockError=fail(e);}
+  }
   const selected=banks.find(b=>b.bank_id===selectedBank)??banks[0];
   const filtered=filterQuestionBanks(
     banks,{query,certification:bankCertFilter,domain:bankDomainFilter},certifications);
@@ -540,6 +596,39 @@ export default function EncryptedOwnerApp({PwaStatus}:{
             onChange={e=>setMinutes(Number(e.target.value))}/></label>
           <button disabled={busy||!selected||eligible.length===0}
             onClick={()=>void startExam()}>Start encrypted exam</button>
+          <fieldset aria-label="Full certification mock" className="owner-mock-setup">
+            <legend>Full Certification Mock — All Domains</legend>
+            <label>Full mock blueprint <select aria-label="Full mock blueprint"
+              value={mockBlueprintId} onChange={e=>setMockBlueprintId(e.target.value)}>
+              {EXAM_BLUEPRINTS.map(profile=>
+                <option key={profile.id} value={profile.id}>
+                  {profile.certificationId} · {profile.syllabusVersion}
+                </option>)}
+            </select></label>
+            <p>Full-length, single-best-answer practice simulation: 150 questions,
+              240 minutes. No explanations before submission; not an official
+              ISACA exam or scaled score.</p>
+            {!mockSyllabus&&<p role="status">
+              Publish the matching certification syllabus and import each domain's
+              question batches to unlock Full Mock.
+            </p>}
+            {fullMockError&&<p role="alert">{fullMockError}</p>}
+            {fullMockStatus&&<div aria-label="Full mock readiness">
+              <h3>Required vs available eligible questions</h3>
+              <ul>{fullMockStatus.domains.map(item=><li key={item.code}>
+                {item.code} — {item.name}: required {item.required},
+                available {item.available}{item.missing>0?', missing '+item.missing:''}
+              </li>)}</ul>
+              {fullMockStatus.issues.length>0&&<p role="alert">
+                Resolve {fullMockStatus.issues.length} duplicate, conflicting or
+                unmapped source questions before attempting Full Mock.
+              </p>}
+            </div>}
+            <button type="button" disabled={busy||!fullMockStatus?.ready}
+              onClick={()=>void startFullMock()}>
+              Start full certification mock — 150 questions
+            </button>
+          </fieldset>
         </div>}
         {exam&&current&&<div>
           <p role="status">Time remaining: {sec(remaining)} · Autosave: {saveState}</p>
@@ -555,7 +644,9 @@ export default function EncryptedOwnerApp({PwaStatus}:{
                 onClick={()=>editSession(s=>({...s,index:q.index}))}>{q.index+1}</button>)}
           </div>
           <h3>Question {exam.session.index+1}: {current.question}</h3>
-          <p>{current.domain} · {current.type==='multiple_choice'?'Select all correct answers':'Select one answer'}</p>
+          <p>{exam.session.bank.bank_id.startsWith('MOCK-')
+            ?'Select the BEST answer'
+            :current.domain+' · '+(current.type==='multiple_choice'?'Select all correct answers':'Select one answer')}</p>
           <fieldset disabled={busy}>
             <legend>Answer options</legend>
             {current.options.map(option=>{
