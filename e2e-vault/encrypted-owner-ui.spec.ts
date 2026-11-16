@@ -59,7 +59,19 @@ test('encrypted-only owner UI refuses duplicate bank and never opens plaintext s
   await page.getByLabel('Import question bank').setInputFiles(DEMO);
   await expect(page.getByText('1 encrypted bank(s)')).toBeVisible();
   await page.getByLabel('Import question bank').setInputFiles(DEMO);
-  await expect(page.getByRole('alert')).toContainText(/Existing encrypted record identity/);
+  await expect(page.getByRole('status').filter({hasText:'exact question bank was already imported'})).toBeVisible();
+  await expect(page.getByText('1 encrypted bank(s)')).toBeVisible();
+  // Changed content under the same bank identity must still be refused.
+  // This must not overwrite or damage the first authenticated bank.
+  const changed=JSON.parse(await readFile(DEMO,'utf8')) as {
+    bank_id:string;title:string
+  };
+  changed.title+=' [tampered]';
+  await page.getByLabel('Import question bank').setInputFiles({
+    name:'same-id-altered-content.json',mimeType:'application/json',
+    buffer:Buffer.from(JSON.stringify(changed))
+  });
+  await expect(page.getByRole('alert')).toContainText(/already exists with different content/);
   await expect(page.getByText('1 encrypted bank(s)')).toBeVisible();
   const raw=await page.evaluate(async()=>{
     const req=indexedDB.open('examprep-secure-vault-v1');
