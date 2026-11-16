@@ -59,6 +59,17 @@ test('encrypted owner starts a 150-question four-domain CISM full mock from four
     await expect(page.getByText(new RegExp('encrypted bank\\(s\\) stored'))).toBeVisible();
   }
   await page.getByRole('button',{name:'Exam Practice'}).click();
+  await page.getByLabel('Merged practice syllabus').selectOption('CISM/2026');
+  await page.getByLabel('Merged practice domain').selectOption('D1');
+  await expect(page.getByText('55 unique question(s) available from source JSON batches.')).toBeVisible();
+  await page.getByLabel('Merged practice question count').fill('10');
+  await page.getByRole('button',{name:'Start merged domain practice'}).click();
+  await expect(page.locator('.owner-navigator button')).toHaveCount(10);
+  page.once('dialog',dialog=>dialog.accept());
+  await page.getByRole('button',{name:'Review and submit'}).click();
+  await expect(page.getByRole('heading',{name:'Verified examination results'})).toBeVisible();
+  await expect(page.getByText(/CISM 2026 D1 merged domain practice · 0\/10/)).toBeVisible();
+  await page.getByRole('button',{name:'Exam Practice'}).click();
   await page.getByLabel('Full mock blueprint').selectOption('ISACA-CISM-2026-11-03-v1');
   const readiness=page.getByLabel('Full mock readiness');
   await expect(readiness).toContainText('D1 — Information Security Governance: required 27, available 55');

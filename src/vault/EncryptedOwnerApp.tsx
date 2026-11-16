@@ -16,6 +16,8 @@ import {selectSecurePracticeQuestions,domainMetricsFromAttempts,studySummary} fr
 import {EXAM_PRESETS,examOverview,examTimeNotice,navigatorItems,submissionReview,type NavigatorFilter} from '../examUx';
 import {EXAM_BLUEPRINTS} from '../examBlueprints';
 import {checkFullMockReadiness,compileFullMock} from '../mockExamAssembler';
+import {collectQuestionPools} from '../questionCollections';
+import {compileMergedDomainPractice} from './mergedPractice';
 import {MAX_VAULT_TRANSFER_BYTES} from './transfer';
 import {restoreValidatedConvertedDestinationIntoEmpty} from './validatedConvertedRestore';
 import OriginTopologyPanel from './OriginTopologyPanel';
@@ -68,6 +70,10 @@ export default function EncryptedOwnerApp({PwaStatus}:{
   const [bankDomainFilter,setBankDomainFilter]=useState('ALL');
   const [examDomain,setExamDomain]=useState('ALL');
   const [mockBlueprintId,setMockBlueprintId]=useState<string>(EXAM_BLUEPRINTS[0].id);
+  const [collectionSyllabusId,setCollectionSyllabusId]=useState('');
+  const [collectionDomainCode,setCollectionDomainCode]=useState('');
+  const [collectionQuestions,setCollectionQuestions]=useState(20);
+  const [collectionMinutes,setCollectionMinutes]=useState(30);
   const [certId,setCertId]=useState('');
   const [certName,setCertName]=useState('');
   const [certProvider,setCertProvider]=useState('');
@@ -420,6 +426,46 @@ export default function EncryptedOwnerApp({PwaStatus}:{
       }
     }finally{if(g===generation.current)setBusy(false);}
   }
+  async function startMergedDomainExam(){
+    if(busy||exam||phase!=='unlocked')return;
+    if(!selectedCollection||!currentCollectionDomain){
+      setError('Choose a published syllabus and a domain for merged practice.');return;
+    }
+    setBusy(true);setError('');
+    const g=generation.current;
+    try{
+      const compiled=compileMergedDomainPractice(banks,selectedCollection,
+        currentCollectionDomain.code,collectionQuestions);
+      const startedAt=new Date().toISOString();
+      const session:ExamSession={
+        id:crypto.randomUUID(),bank:copy(compiled),questions:copy(compiled.questions),
+        answers:{},marked:[],index:0,startedAt,
+        endsAt:Date.parse(startedAt)+collectionMinutes*60_000,
+        durationSeconds:collectionMinutes*60
+      };
+      if(!Number.isInteger(collectionMinutes)||collectionMinutes<1||collectionMinutes>300){
+        throw new Error('Choose a 1–300-minute practice duration');
+      }
+      if(new TextEncoder().encode(JSON.stringify(session)).byteLength>6*1024*1024){
+        throw new Error('Merged practice session exceeds safe encrypted storage capacity');
+      }
+      const rt=ctx();
+      // Immutable derived bank must be ciphertext-backed before exam creation.
+      await rt.addBank(compiled);
+      if(g!==generation.current)throw new Error('Vault locked during merged practice setup');
+      const started=await rt.startExam(session);
+      if(g!==generation.current)return;
+      committed.current=started;draft.current=started;
+      setExam(started);setNow(Date.now());setView('exam');setResult(null);
+      setSaveState('saved');setMessage('Merged-domain exam started with encrypted source snapshots.');
+      await refresh();
+    }catch(e){
+      if(g===generation.current){
+        setError('Merged-domain exam not started: '+fail(e)+
+          '. Any already encrypted derived bank was retained; source banks were not overwritten.');
+      }
+    }finally{if(g===generation.current)setBusy(false);}
+  }
   function editSession(change:(s:ExamSession)=>ExamSession){
     if(!draft.current||busy)return;
     const owner=binding.current?.owner;
@@ -455,6 +501,23 @@ export default function EncryptedOwnerApp({PwaStatus}:{
     finally{if(g===generation.current)setBusy(false);submitting.current=false;}
   }
 
+  const selectedCollection=syllabi.find(item=>item.status==='published'&&
+    item.id===collectionSyllabusId)??syllabi.find(item=>item.status==='published');
+  const currentCollectionDomain=selectedCollection?.domains.find(item=>
+    item.code===collectionDomainCode)??selectedCollection?.domains[0];
+  let collectionIssue='';
+  let collectionAvailable=0;
+  if(selectedCollection&&currentCollectionDomain){
+    try{
+      const view=collectQuestionPools(banks.filter(item=>
+        !item.bank_id.startsWith('MOCK-')&&!item.bank_id.startsWith('POOL-')),
+        selectedCollection);
+      collectionAvailable=view.domains.find(item=>item.domainCode===currentCollectionDomain.code)
+        ?.questions.length??0;
+      if(view.issues.length>0)collectionIssue=
+        'Resolve '+view.issues.length+' conflicting, duplicate or unmapped question(s).';
+    }catch(e){collectionIssue=fail(e);}
+  }
   const mockBlueprint=EXAM_BLUEPRINTS.find(item=>item.id===mockBlueprintId);
   const mockSyllabus=mockBlueprint?syllabi.find(item=>
     item.id===mockBlueprint.certificationId+'/'+mockBlueprint.syllabusVersion&&
@@ -600,6 +663,39 @@ export default function EncryptedOwnerApp({PwaStatus}:{
             onChange={e=>setMinutes(Number(e.target.value))}/></label>
           <button disabled={busy||!selected||eligible.length===0}
             onClick={()=>void startExam()}>Start encrypted exam</button>
+          <fieldset aria-label="Merged domain practice" className="owner-mock-setup">
+            <legend>Merged Domain Practice — All Uploaded Batches</legend>
+            <label>Published certification syllabus
+              <select aria-label="Merged practice syllabus" value={selectedCollection?.id??''}
+                onChange={e=>{setCollectionSyllabusId(e.target.value);setCollectionDomainCode('');}}>
+                {syllabi.filter(item=>item.status==='published').map(item=>
+                  <option key={item.id} value={item.id}>{item.certificationId} · {item.version}</option>)}
+              </select>
+            </label>
+            {!selectedCollection&&<p role="status">Publish a syllabus before using merged domain practice.</p>}
+            {selectedCollection&&<label>Domain
+              <select aria-label="Merged practice domain" value={currentCollectionDomain?.code??''}
+                onChange={e=>setCollectionDomainCode(e.target.value)}>
+                {selectedCollection.domains.map(item=>
+                  <option key={item.code} value={item.code}>{item.code} — {item.name}</option>)}
+              </select>
+            </label>}
+            <p role="status">{collectionAvailable} unique question(s) available from source JSON batches.</p>
+            {collectionIssue&&<p role="alert">{collectionIssue}</p>}
+            <label>Questions <input type="number" min={1} max={Math.max(1,collectionAvailable)}
+              aria-label="Merged practice question count" value={collectionQuestions}
+              onChange={e=>setCollectionQuestions(Number(e.target.value))}/></label>
+            <label>Duration (minutes) <input type="number" min={1} max={300}
+              aria-label="Merged practice minutes" value={collectionMinutes}
+              onChange={e=>setCollectionMinutes(Number(e.target.value))}/></label>
+            <button type="button" disabled={busy||!selectedCollection||!!collectionIssue||
+              collectionQuestions<1||collectionQuestions>collectionAvailable||
+              !Number.isInteger(collectionQuestions)||collectionMinutes<1||
+              collectionMinutes>300||!Number.isInteger(collectionMinutes)}
+              onClick={()=>void startMergedDomainExam()}>
+              Start merged domain practice
+            </button>
+          </fieldset>
           <fieldset aria-label="Full certification mock" className="owner-mock-setup">
             <legend>Full Certification Mock — All Domains</legend>
             <label>Full mock blueprint <select aria-label="Full mock blueprint"
