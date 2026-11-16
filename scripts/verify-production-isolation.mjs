@@ -43,6 +43,12 @@ const frozen={
   "src/data/indexeddbReadRepository.ts": "5c73aa8d17543af6b0fda8e0f7d8cecab3ad48c6",
   "src/data/indexeddbReadRepository.test.ts": "846d02e1d8b3fe3a301a36bc6c92809db38a90fb",
   "src/db.ts": "621263167fe537b7024356f9fd067cffd3acdb52",
+  // QB-008/EX-006: reviewed pure collector, source-exam blueprints and
+  // synthetic tests; no production App or encrypted-owner import introduced.
+  "src/questionCollections.ts": "7d7f555e4eba6ac396249494531586c6ce5156d7",
+  "src/examBlueprints.ts": "81a1ce72d8b560261deed4fb91b4e2f5e7594ff5",
+  "src/mockExamAssembler.ts": "e2985071bea82b713d7de1bf50e6d9b965ea0b91",
+  "src/mockExamAssembler.test.ts": "77c9aa526c63a1ec64993b8ade17d39687bad57f",
   "src/examUx.test.ts": "f99c77e20c87eca6505ad071cb690b10b0a89b97",
   "src/examUx.ts": "4e8671fab757572463b42469ce1a03cde2a4d260",
   "src/examLock.test.ts": "bd70d94df2cf9935d8ea59ecd8bbd3a144dd3320",
