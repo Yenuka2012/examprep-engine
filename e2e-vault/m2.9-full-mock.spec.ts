@@ -56,7 +56,7 @@ test('encrypted owner starts a 150-question four-domain CISM full mock from four
         certification:'CISM',syllabus_version:'2026',questions
       }))
     });
-    await expect(page.getByText(new RegExp('^'+(index+1)+' encrypted bank\\\\(s\\\\) stored'))).toBeVisible();
+    await expect(page.getByText(new RegExp('^'+(index+1)+' encrypted bank\\(s\\) stored'))).toBeVisible();
   }
   // An additional D1 JSON batch contributes to the SAME canonical domain
   // without rewriting the first D1 bank or altering another domain.
