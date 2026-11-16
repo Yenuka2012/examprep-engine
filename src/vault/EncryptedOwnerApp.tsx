@@ -17,6 +17,8 @@ import {EXAM_PRESETS,examOverview,examTimeNotice,navigatorItems,submissionReview
 import {EXAM_BLUEPRINTS} from '../examBlueprints';
 import {checkFullMockReadiness,compileFullMock} from '../mockExamAssembler';
 import {collectQuestionPools} from '../questionCollections';
+import {jsonEqual} from '../jsonEqual';
+import {validateBank} from '../logic';
 import {compileMergedDomainPractice} from './mergedPractice';
 import {MAX_VAULT_TRANSFER_BYTES} from './transfer';
 import {restoreValidatedConvertedDestinationIntoEmpty} from './validatedConvertedRestore';
@@ -282,8 +284,26 @@ export default function EncryptedOwnerApp({PwaStatus}:{
       if(file.size<1||file.size>MAX_IMPORT_BYTES)throw new Error('JSON file must be 1 byte–5 MiB.');
       const raw:unknown=JSON.parse(await file.text());
       const rt=ctx();
-      if(category==='bank')await rt.addBank(raw);
-      else if(category==='certification')await rt.addCertification(raw);
+      if(category==='bank'){
+        const validated=validateBank(raw);
+        if(validated.errors.length)throw new Error(
+          'Invalid question-bank JSON: '+validated.errors[0]
+        );
+        const present=(await rt.listBanks()).find(
+          item=>item.bank_id===validated.bank!.bank_id
+        );
+        if(present){
+          if(!jsonEqual(present,validated.bank)){
+            throw new Error('Question-bank ID already exists with different content. '+
+              'Use a new batch bank_id to add questions without overwriting sources.');
+          }
+          if(g===generation.current)setMessage(
+            'This exact question bank was already imported; no questions were duplicated.'
+          );
+          return;
+        }
+        await rt.addBank(validated.bank);
+      }else if(category==='certification')await rt.addCertification(raw);
       else await rt.addSyllabus(raw);
       if(g!==generation.current)return;
       await refresh();

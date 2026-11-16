@@ -76,6 +76,16 @@ test('encrypted owner starts a 150-question four-domain CISM full mock from four
     }))
   });
   await expect(page.getByText('5 encrypted bank(s)')).toBeVisible();
+  await page.getByLabel('Import question bank').setInputFiles({
+    name:'D1-supplemental-repeat.json',mimeType:'application/json',
+    buffer:Buffer.from(JSON.stringify({
+      schema_version:'1.0',bank_id:'CISM-D1-SUPPLEMENTAL',
+      title:'Second D1 Synthetic Batch',certification:'CISM',
+      syllabus_version:'2026',questions:supplemental
+    }))
+  });
+  await expect(page.getByText(/exact question bank was already imported/)).toBeVisible();
+  await expect(page.getByText('5 encrypted bank(s)')).toBeVisible();
   await page.getByRole('button',{name:'Exam Practice'}).click();
   await page.getByLabel('Merged practice syllabus').selectOption('CISM/2026');
   await page.getByLabel('Merged practice domain').selectOption('D1');
