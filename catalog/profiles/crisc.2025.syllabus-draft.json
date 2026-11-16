@@ -1,0 +1,80 @@
+{
+  "id": "CRISC/2025",
+  "certificationId": "CRISC",
+  "version": "2025",
+  "title": "CRISC 2025 Exam Content Outline",
+  "sourceUrl": "https://www.isaca.org/credentialing/crisc/crisc-exam-content-outline",
+  "reviewedAt": "2026-11-16",
+  "domains": [
+    {
+      "code": "D1",
+      "name": "Governance",
+      "weight": 26,
+      "objectives": [
+        "Enterprise strategy and risk-governance alignment",
+        "Organizational structure, authority, and risk responsibilities",
+        "Ethics, policies, and standards",
+        "Business-process resilience and organizational assets",
+        "Enterprise risk management principles",
+        "Risk profiles and risk appetite versus tolerance",
+        "Risk management frameworks and external obligations",
+        "Risk reporting, ownership, and governance oversight"
+      ]
+    },
+    {
+      "code": "D2",
+      "name": "Risk Assessment",
+      "weight": 22,
+      "objectives": [
+        "Risk events and emerging threats",
+        "Threat modeling and vulnerability analysis",
+        "Risk scenario design and evaluation",
+        "Risk assessment methods and professional standards",
+        "Business impact analysis for risk prioritization",
+        "Risk-register maintenance and lifecycle",
+        "Likelihood, impact, and uncertainty analysis",
+        "Inherent and residual risk differentiation"
+      ]
+    },
+    {
+      "code": "D3",
+      "name": "Risk Response and Reporting",
+      "weight": 32,
+      "objectives": [
+        "Selection of risk response options",
+        "Risk and control ownership",
+        "Supplier and supply-chain risk oversight",
+        "Risk issues, findings, exemptions, and exceptions",
+        "Control frameworks and risk-based control types",
+        "Control selection, implementation, and refinement",
+        "Control testing and operating-effectiveness assessment",
+        "Risk response action plans and remediation tracking",
+        "Risk data quality and validation",
+        "Risk and control indicators and metrics",
+        "Risk dashboards and stakeholder communication",
+        "Monitoring of residual and emerging risk"
+      ]
+    },
+    {
+      "code": "D4",
+      "name": "Technology and Security",
+      "weight": 20,
+      "objectives": [
+        "Technology principles and enterprise architecture",
+        "IT operations and change management",
+        "Secure systems-development lifecycle risks",
+        "Information and data lifecycle controls",
+        "Portfolio and project risk governance",
+        "Technology resilience and disaster recovery",
+        "Emerging technology opportunities and threats",
+        "Security concepts, standards, and frameworks",
+        "Security and risk-awareness training",
+        "Privacy and information protection principles"
+      ]
+    }
+  ],
+  "status": "draft",
+  "revision": 1,
+  "createdAt": "2026-11-16T04:00:00.000Z",
+  "updatedAt": "2026-11-16T04:00:00.000Z"
+}
