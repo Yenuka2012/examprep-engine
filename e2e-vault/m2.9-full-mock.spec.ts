@@ -40,7 +40,7 @@ test('encrypted owner starts a 150-question four-domain CISM full mock from four
   await expect(page.getByText('Synthetic published CISM blueprint')).toBeVisible();
 
   await page.getByRole('button',{name:'Manage Content'}).click();
-  for(const [code,name] of areas){
+  for(const [index,[code,name]] of areas.entries()){
     const questions=Array.from({length:55},(_,i)=>({
       id:'MOCK-'+code+'-Q'+String(i+1).padStart(3,'0'),
       domain:name,type:'single_choice',
@@ -56,7 +56,7 @@ test('encrypted owner starts a 150-question four-domain CISM full mock from four
         certification:'CISM',syllabus_version:'2026',questions
       }))
     });
-    await expect(page.getByText(new RegExp('encrypted bank\\(s\\) stored'))).toBeVisible();
+    await expect(page.getByText(new RegExp('^'+(index+1)+' encrypted bank\\\\(s\\\\) stored'))).toBeVisible();
   }
   await page.getByRole('button',{name:'Exam Practice'}).click();
   await page.getByLabel('Full mock blueprint').selectOption('ISACA-CISM-2026-11-03-v1');
