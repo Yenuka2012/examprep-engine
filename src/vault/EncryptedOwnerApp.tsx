@@ -384,7 +384,10 @@ export default function EncryptedOwnerApp({PwaStatus}:{
     setBusy(true);setError('');
     const g=generation.current;
     try{
-      const result=compileFullMock(blueprint,banks,syllabus);
+      // Derived full-mock banks are immutable session artifacts, not fresh
+      // original question uploads. Avoid re-ingesting them on subsequent mocks.
+      const sourceBanks=banks.filter(item=>!item.bank_id.startsWith('MOCK-'));
+      const result=compileFullMock(blueprint,sourceBanks,syllabus);
       // Existing M2.8 exam validation embeds the complete bank AND question
       // snapshots. Reject oversized sessions before writing any ciphertext.
       const startedAt=new Date().toISOString();
@@ -459,7 +462,8 @@ export default function EncryptedOwnerApp({PwaStatus}:{
   let fullMockStatus:ReturnType<typeof checkFullMockReadiness>|undefined;
   let fullMockError='';
   if(mockBlueprint&&mockSyllabus){
-    try{fullMockStatus=checkFullMockReadiness(mockBlueprint,banks,mockSyllabus);}
+    try{fullMockStatus=checkFullMockReadiness(mockBlueprint,
+      banks.filter(item=>!item.bank_id.startsWith('MOCK-')),mockSyllabus);}
     catch(e){fullMockError=fail(e);}
   }
   const selected=banks.find(b=>b.bank_id===selectedBank)??banks[0];
