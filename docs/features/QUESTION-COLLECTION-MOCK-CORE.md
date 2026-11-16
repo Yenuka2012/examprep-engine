@@ -50,3 +50,17 @@ Sources:
 - Separate import preview/collection UI: reviewed PR #151.
 - Separate encrypted-owner compiled-bank persistence+exam UI: reviewed PR #152. Requires real origin, physical iOS and recovery checks.
 - Ship only after all P0/P1 safety checks and owner acceptance. Defer features rather than weaken the v1.0 security critical path.
+
+## Explicit approved source pins for the Pages fail-closed gate
+
+This pure logic PR adds four ordinary src files; the existing fail-closed
+`scripts/verify-production-isolation.mjs` must hash-allowlist each new file,
+otherwise it rejects even unused source files. The change pins only:
+
+- `src/questionCollections.ts`: `7d7f555e4eba6ac396249494531586c6ce5156d7`
+- `src/examBlueprints.ts`: `81a1ce72d8b560261deed4fb91b4e2f5e7594ff5`
+- `src/mockExamAssembler.ts`: `e2985071bea82b713d7de1bf50e6d9b965ea0b91`
+- `src/mockExamAssembler.test.ts`: `77c9aa526c63a1ec64993b8ade17d39687bad57f`
+
+Every existing approved source hash and production bundle forbidden-marker scan
+remains intact. This approval is for pure, currently unreferenced modules only.
