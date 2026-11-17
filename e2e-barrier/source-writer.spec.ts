@@ -84,7 +84,7 @@ test('exclusive source freeze blocks exam creation; normal session resumes when 
     await releaseExclusiveSourceFreeze(holder);
     await page.getByRole('button',{name:'Start examination'}).click();
     await expect(page.getByText(/Question 1 of/)).toBeVisible();
-    await expect(page.getByText('Exam progress saved locally.')).toBeVisible();
+    await expect(page.locator('.exam-actions-note')).toHaveText('Saved locally');
     await verifyNoProductionVault(page);
   }finally{
     await holder.close();
@@ -97,7 +97,7 @@ test('source freeze fails exam autosave closed and permits later retry, no data 
   await page.getByRole('button',{name:'Practise'}).first().click();
   await page.getByRole('button',{name:'Start examination'}).click();
   await expect(page.getByText(/Question 1 of/)).toBeVisible();
-  await expect(page.getByText('Exam progress saved locally.')).toBeVisible();
+  await expect(page.locator('.exam-actions-note')).toHaveText('Saved locally');
   const holder=await context.newPage();
   try{
     await holdExclusiveSourceFreeze(holder);
@@ -106,7 +106,7 @@ test('source freeze fails exam autosave closed and permits later retry, no data 
     await expect(page.getByRole('button',{name:'Unflag'})).toBeVisible();
     await releaseExclusiveSourceFreeze(holder);
     await page.getByRole('button',{name:'Retry save'}).click();
-    await expect(page.getByText('Exam progress saved locally.')).toBeVisible();
+    await expect(page.locator('.exam-actions-note')).toHaveText('Saved locally');
     await page.reload();
     await expect(page.getByText(/Question 1 of/)).toBeVisible();
     await expect(page.getByRole('button',{name:'Unflag'})).toBeVisible();

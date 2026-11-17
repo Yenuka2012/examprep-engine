@@ -20,7 +20,7 @@ const frozen={
   "index.html": "41c5c0a69408f61c95ffe88cdd404762ce750185",
   "public/favicon.svg": "778ad69298b6b89045dc8b0a924f85c27bf1c48d",
   "scripts/generate-validator.mjs": "afac5049c68a8a28f07679bc1e9f1a4655da6633",
-  "src/App.tsx": "81705d5b10a891b35d3817ef79c2d07192a2bd48",
+  "src/App.tsx": "4cd044ac6281d131e79b394173f24d5d5ede7cfa",
   "src/CatalogPanel.tsx": "78a207001d19908c32df5aecb32400707cd190c3",
   "src/CutoverReadinessPanel.tsx": "78a4666a45371a0c5af5ff6ebc44909d1ad69c9b",
   "src/PwaStatus.tsx": "dcb531a4b3e2965b46a019628c4b187f7d92f5e0",
@@ -43,6 +43,12 @@ const frozen={
   "src/data/indexeddbReadRepository.ts": "5c73aa8d17543af6b0fda8e0f7d8cecab3ad48c6",
   "src/data/indexeddbReadRepository.test.ts": "846d02e1d8b3fe3a301a36bc6c92809db38a90fb",
   "src/db.ts": "621263167fe537b7024356f9fd067cffd3acdb52",
+  // QB-008/EX-006: reviewed pure collector, source-exam blueprints and
+  // synthetic tests; no production App or encrypted-owner import introduced.
+  "src/questionCollections.ts": "7d7f555e4eba6ac396249494531586c6ce5156d7",
+  "src/examBlueprints.ts": "81a1ce72d8b560261deed4fb91b4e2f5e7594ff5",
+  "src/mockExamAssembler.ts": "e2985071bea82b713d7de1bf50e6d9b965ea0b91",
+  "src/mockExamAssembler.test.ts": "77c9aa526c63a1ec64993b8ade17d39687bad57f",
   "src/examUx.test.ts": "f99c77e20c87eca6505ad071cb690b10b0a89b97",
   "src/examUx.ts": "4e8671fab757572463b42469ce1a03cde2a4d260",
   "src/examLock.test.ts": "bd70d94df2cf9935d8ea59ecd8bbd3a144dd3320",
@@ -68,7 +74,7 @@ const frozen={
   "src/schema.json": "03a6c56173914e4ab4d8d8cd22dfee7d9a3f1848",
   "src/storageVersionGuard.test.ts": "b4e1ab48d99812504ee92ac91912d95f4335bd12",
   "src/storageVersionGuard.ts": "523a8f222fb2ec2429d65a3ffee6e6460bf2e215",
-  "src/styles.css": "6607c31dc52a296c76e6159f6394d30727a09db1",
+  "src/styles.css": "c421b8572e8f2a7d0e063a44533a29e6f866c5b1",
   "src/types.ts": "0795739bbac673100aaea97a98ad528623f77f79",
   "src/vite-env.d.ts": "64251fba07826fb9f05570afb6d4b7d2b0cea3a2",
   "vite.config.ts": "da9af2e40079b99f858367df6a946c99385ce3ef"

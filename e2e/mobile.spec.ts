@@ -28,6 +28,8 @@ test('mobile WebKit import, responsive exam and encrypted backup export',async({
   await page.getByRole('button',{name:'Practise'}).first().click();
   await page.getByRole('button',{name:'Start examination'}).click();
   await expect(page.getByText('Which choice is best for offline private data?')).toBeVisible();
+  await expect(page.locator('.exam-actions-note')).toBeVisible();
+  await expect(page.locator('.exam-actions-note')).toHaveText('Saved locally');
   await page.getByRole('radio').first().check();
   await expect(page.getByRole('button',{name:'Questions'})).toBeVisible();
   await page.getByRole('button',{name:'Questions'}).click();
@@ -40,7 +42,9 @@ test('mobile WebKit import, responsive exam and encrypted backup export',async({
     page:document.documentElement.scrollWidth
   }));
   expect(examWidth.page).toBeLessThanOrEqual(examWidth.viewport+2);
-  page.once('dialog',dialog=>dialog.accept());
   await page.getByRole('button',{name:'Submit exam'}).click();
+  const review=page.getByRole('dialog',{name:'Review before submitting'});
+  await expect(review).toBeVisible();
+  await review.getByRole('button',{name:'Confirm submission'}).click();
   await expect(page.getByText('EXAM COMPLETE')).toBeVisible();
 });

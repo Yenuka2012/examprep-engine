@@ -53,8 +53,9 @@ test('history filters and results insights are read-only and preserve saved atte
   await page.getByRole('button',{name:'Start examination'}).click();
   await expect(page.getByText(/Question 1 of/)).toBeVisible();
   await page.locator('.choices input').first().check();
-  page.once('dialog',dialog=>dialog.accept());
   await page.getByRole('button',{name:'Submit exam'}).click();
+  await page.getByRole('dialog',{name:'Review before submitting'})
+    .getByRole('button',{name:'Confirm submission'}).click();
   await expect(page.getByText('EXAM COMPLETE')).toBeVisible();
   const details=page.locator('section[aria-label="Detailed examination result"]');
   await expect(details).toContainText('Unanswered: 4');
